@@ -11,36 +11,44 @@ import java.util.stream.Stream;
 public class Animal extends AbstractMapElement {
     private MapDirections orient;
     private final List<Integer> genes = new ArrayList<>();
+    private final int birthDay;
+    private int lifetime = 0;
+    private int childrenNumber = 0;
+    private final List<Animal> children = new ArrayList<>();
 
     //INITIAL BORN
-    public Animal(Vector2d startPosition, AbstractMap map, int startEnergy, IObserver observer) {
+    public Animal(Vector2d startPosition, AbstractMap map, int startEnergy, IObserver observer, int birthDay) {
         this.position = startPosition;
         this.orient = getRandomOrient();
         this.map = map;
         getRandomGenotype();
         this.energy = startEnergy;
         this.observer = observer;
+        this.birthDay = birthDay;
     }
 
     //NORMAL BORN
-    public Animal(Animal dad, Animal mom, AbstractMap map, IObserver observer) {
-        System.out.println("ELO MAM TERAZ DZIECIAKA");
+    public Animal(Animal dad, Animal mom, AbstractMap map, IObserver observer, int birthDay) {
         this.position = dad.getPosition();
         this.orient = getRandomOrient();
         this.map = map;
         getGenotypeFromParents(dad, mom);
         this.energy = getEnergyFromParents(dad, mom);
         this.observer = observer;
+        this.birthDay = birthDay;
+        dad.childrenNumber++;
+        mom.childrenNumber++;
     }
 
     //MAGIC BORN
-    public Animal(Vector2d startPosition, AbstractMap map, Animal animalToCopy, int maxEnergy, IObserver observer){
+    public Animal(Vector2d startPosition, AbstractMap map, Animal animalToCopy, int maxEnergy, IObserver observer, int birthDay){
         this.position = startPosition;
         this.orient = animalToCopy.getOrient();
         this.map = map;
         this.genes.addAll(animalToCopy.getGenes());
         this.energy = maxEnergy;
         this.observer = observer;
+        this.birthDay = birthDay;
     }
 
     public void move(int moveEnergy) {
@@ -51,7 +59,7 @@ public class Animal extends AbstractMapElement {
         else this.orient = this.orient.getDirectionAfterRotation(directionNumber);
 
         this.energy -= moveEnergy;
-        System.out.println(this.energy);
+        this.lifetime++;
     }
 
     public void moveForward() {
@@ -151,5 +159,17 @@ public class Animal extends AbstractMapElement {
 
     public MapDirections getOrient() {
         return orient;
+    }
+
+    public int getLifetime() {
+        return lifetime;
+    }
+
+    public int getChildrenNumber() {
+        return childrenNumber;
+    }
+
+    public void setChildrenNumber(int childrenNumber) {
+        this.childrenNumber = childrenNumber;
     }
 }

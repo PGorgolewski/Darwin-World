@@ -13,8 +13,8 @@ abstract class AbstractMap implements IObserver{
     protected final Vector2d jungleUpperRight;
     protected final Set<Vector2d> jungleFreePositions = new HashSet<>();
     protected final Set<Vector2d> stepFreePositions = new HashSet<>();
-    protected final Map<Vector2d, Set<AbstractMapElement>> jungleElementPositions = new HashMap<>();
-    protected final Map<Vector2d, Set<AbstractMapElement>> stepElementPositions = new HashMap<>();
+    protected final Map<Vector2d, Grass> grassMap = new HashMap<>();
+    protected final Map<Vector2d, Set<Animal>> animalMap = new HashMap<>();
 
     protected AbstractMap(int width, int height, float jungleRatio) {
         this.width = width;
@@ -34,11 +34,10 @@ abstract class AbstractMap implements IObserver{
                 Vector2d currVector = new Vector2d(x,y);
                 if (isPositionInJungle(currVector)){
                     this.jungleFreePositions.add(currVector);
-                    this.jungleElementPositions.put(currVector, new HashSet<>());
                 }else {
                     this.stepFreePositions.add(currVector);
-                    this.stepElementPositions.put(currVector, new HashSet<>());
                 }
+                this.animalMap.put(currVector, new HashSet<>());
             }
         }
     }
@@ -69,31 +68,38 @@ abstract class AbstractMap implements IObserver{
     protected void placeElement(AbstractMapElement mapElement){
         Vector2d elementVector = mapElement.getPosition();
         if (isPositionInJungle(elementVector)){
-            this.placeElementForGivenMap(mapElement, elementVector, this.jungleElementPositions, this.jungleFreePositions);
+            this.placeElementForGivenMap(mapElement, elementVector, this.jungleFreePositions);
         }else {
-            this.placeElementForGivenMap(mapElement, elementVector, this.stepElementPositions, this.stepFreePositions);
+            this.placeElementForGivenMap(mapElement, elementVector,  this.stepFreePositions);
         }
     }
 
-    protected void placeElementForGivenMap(AbstractMapElement mapElement, Vector2d elementVector,
-                                           Map<Vector2d, Set<AbstractMapElement>> givenMap, Set<Vector2d> givenSet){
+    protected void placeElementForGivenMap(AbstractMapElement mapElement, Vector2d elementVector, Set<Vector2d> givenSet){
         givenSet.remove(elementVector);
-        givenMap.get(elementVector).add(mapElement);
+        if (mapElement instanceof Animal){
+            this.animalMap.get(elementVector).add((Animal) mapElement);
+        }else{
+            this.grassMap.put(elementVector, (Grass) mapElement);
+        }
     }
 
     protected void removeElement(AbstractMapElement mapElement, Vector2d elementPosition){
         if (isPositionInJungle(elementPosition)){
-            this.removeGivenElement(mapElement, elementPosition, this.jungleElementPositions, this.jungleFreePositions);
+            this.removeGivenElement(mapElement, elementPosition, this.jungleFreePositions);
         }else {
-            this.removeGivenElement(mapElement, elementPosition, this.stepElementPositions, this.stepFreePositions);
+            this.removeGivenElement(mapElement, elementPosition, this.stepFreePositions);
         }
     }
 
     protected void removeGivenElement(AbstractMapElement mapElement, Vector2d elementPosition,
-                                      Map<Vector2d, Set<AbstractMapElement>> givenElementPositions,
                                       Set<Vector2d> givenFreePositions){
-        givenElementPositions.get(elementPosition).remove(mapElement);
-        if (givenElementPositions.get(elementPosition).size() == 0){
+        if (mapElement instanceof Animal){
+            this.animalMap.get(elementPosition).remove(mapElement);
+        }else {
+            this.grassMap.remove(elementPosition);
+        }
+
+        if (this.animalMap.get(elementPosition).size() == 0 && !this.grassMap.containsKey(elementPosition)){
             givenFreePositions.add(elementPosition);
         }
     }
@@ -110,42 +116,26 @@ abstract class AbstractMap implements IObserver{
         return width;
     }
 
-    public Set<AbstractMapElement> getElementsFromGivenPosition(Vector2d position) {
-        if (isPositionInJungle(position)){
-            return this.jungleElementPositions.get(position);
-        }else {
-            return this.stepElementPositions.get(position);
-        }
+    public Set<Animal> getAnimalsFromGivenPosition(Vector2d position) {
+        return this.animalMap.get(position);
     }
 
     public List<Animal> getSortedListOfAnimalsOnPosition(Vector2d position){
-        return this.getElementsFromGivenPosition(position).stream()
-                .filter(e -> e instanceof Animal)
-                .map(e -> (Animal) e)
+        return this.getAnimalsFromGivenPosition(position).stream()
                 .sorted((a1, a2) -> Float.compare(a1.getEnergy(), a2.getEnergy()))
                 .collect(Collectors.toCollection(ArrayList::new));
     }
     protected Map<Vector2d, List<Animal>> getPositionsByAnimalsMap(int minAnimals, float minEnergy){
-        Map<Vector2d, List<Animal>> positionsByAnimals = getPositionsByAnimalFromGivenMap(minAnimals, minEnergy,
-                this.jungleElementPositions);
-        positionsByAnimals.putAll(getPositionsByAnimalFromGivenMap(minAnimals, minEnergy, this.stepElementPositions));
-        return positionsByAnimals;
-    }
-
-    protected Map<Vector2d, List<Animal>> getPositionsByAnimalFromGivenMap(int minAnimals, float minEnergy,
-                                                                           Map<Vector2d, Set<AbstractMapElement>> givenMap){
         Map<Vector2d, List<Animal>> positionsByAnimals = new HashMap<>();
-        givenMap.forEach((k,v) -> {
+        this.animalMap.forEach((k,v) -> {
             List<Animal> animalsOnPosition = v.stream()
-                    .filter(e -> (e instanceof Animal && e.getEnergy() >= minEnergy))
-                    .map(e -> (Animal) e)
+                    .filter(e -> (e.getEnergy() >= minEnergy))
                     .collect(Collectors.toCollection(ArrayList::new));
 
             if (animalsOnPosition.size() >= minAnimals){
                 positionsByAnimals.put(k,animalsOnPosition);
             }
         });
-
         return positionsByAnimals;
     }
 
@@ -165,14 +155,6 @@ abstract class AbstractMap implements IObserver{
     }
 
     protected boolean isGrassOnPosition(Vector2d position){
-        if (isPositionInJungle(position)){
-            return this.isGrassOnPositionForGivenMap(this.jungleElementPositions.get(position));
-        }else {
-            return this.isGrassOnPositionForGivenMap(this.stepElementPositions.get(position));
-        }
-    }
-
-    protected boolean isGrassOnPositionForGivenMap(Set<AbstractMapElement> setOfElements){
-        return setOfElements.stream().anyMatch(element -> element instanceof Grass);
+        return this.grassMap.containsKey(position);
     }
 }

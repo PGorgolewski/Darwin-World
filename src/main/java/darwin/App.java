@@ -6,6 +6,7 @@ import javafx.geometry.HPos;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
+
 import javafx.scene.control.Button;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
@@ -13,10 +14,11 @@ import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 
-//TODO ZrobGuiMapy CHYBA DONE
 //TODO zrobParser
 //TODO zrob statystki
 //TODO zatrzymywanie i wznawianie
@@ -30,22 +32,34 @@ public class App extends Application implements IAppObserver {
     SimulationEngine snakeEngine;
     SimulationEngine wallEngine;
     private int startEnergy;
+    private DoublePlot snakeDoublePlot;
+    private DoublePlot wallDoublePlot;
+    private final Map<String, Plot> wallPlots = new HashMap<>();
+    private final Map<String, Plot> snakePlots = new HashMap<>();
 
     public void init() {
-        //TODO ogarnąć podawanie parametrów
         int width = 10;
         int height = 10;
         float jungleRatio = 0.4f;
         int startAnimalsNumber = 20;
         int startEnergy = 200;
-        int maxEnergy = 200;
         int grassEnergy = 40;
         int moveEnergy = 5;
         this.startEnergy = startEnergy;
         this.snakeEngine = new SimulationEngine(width, height, jungleRatio, startAnimalsNumber,
-                startEnergy, maxEnergy, moveEnergy, grassEnergy, false, this);
+                startEnergy, moveEnergy, grassEnergy, false, this);
         this.wallEngine = new SimulationEngine(width, height, jungleRatio, startAnimalsNumber,
-                startEnergy, maxEnergy, moveEnergy, grassEnergy, true, this);
+                startEnergy, moveEnergy, grassEnergy, true, this);
+        this.snakeDoublePlot = new DoublePlot("Animals","Grasses", startAnimalsNumber, 0);
+        this.wallDoublePlot = new DoublePlot("Animals","Grasses", startAnimalsNumber, 0);
+        this.addPlots(this.wallPlots);
+        this.addPlots(this.snakePlots);
+    }
+
+    public void addPlots(Map<String, Plot> givenMap){
+        givenMap.put("Average energy", new Plot("Average energy", startEnergy));
+        givenMap.put("Average lifetime", new Plot("Average lifetime", 0));
+        givenMap.put("Average children number", new Plot("Average children number", 0));
     }
 
     public void start(Stage primaryStage) {
@@ -57,8 +71,12 @@ public class App extends Application implements IAppObserver {
 
         HBox startStopSnakeBox = this.prepareStartStopBox(engineSnakeThread);
         HBox startStopWallBox = this.prepareStartStopBox(engineWallThread);
-        VBox snakeVBox = new VBox(40, this.snakeGrid, startStopSnakeBox);
-        VBox wallVBox = new VBox(40, this.wallGrid, startStopWallBox);
+
+
+        VBox snakeVBox = new VBox(40, this.snakeGrid, startStopSnakeBox,
+                this.prepareAllPlotsVBox(this.snakeDoublePlot, this.snakePlots));
+        VBox wallVBox = new VBox(40, this.wallGrid, startStopWallBox,
+                this.prepareAllPlotsVBox(this.wallDoublePlot, this.wallPlots));
 
         HBox hBox = new HBox(40, snakeVBox, wallVBox);
         hBox.setAlignment(Pos.CENTER);
@@ -68,6 +86,19 @@ public class App extends Application implements IAppObserver {
         primaryStage.setScene(scene);
         primaryStage.setTitle("Darwin World Simulation");
         primaryStage.show();
+    }
+
+    public VBox prepareAllPlotsVBox(DoublePlot givenDoublePlot, Map<String, Plot> givenPlots){
+        return new VBox(40, this.preparePlotHBox(givenDoublePlot, givenPlots.get("Average energy")),
+                this.preparePlotHBox(givenPlots.get("Average lifetime"), givenPlots.get("Average children number")));
+    }
+
+    public HBox preparePlotHBox(DoublePlot doublePlot, Plot plot){
+       return new HBox(20, doublePlot.getLineChart(), plot.getLineChart());
+    }
+
+    public HBox preparePlotHBox(Plot firstPlot, Plot secondPlot){
+        return new HBox(20, firstPlot.getLineChart(), secondPlot.getLineChart());
     }
 
     public HBox prepareStartStopBox(Thread givenSimulationThread){
@@ -100,10 +131,21 @@ public class App extends Application implements IAppObserver {
         return button;
     }
 
-    public void show(AbstractMap map) {
+    public void show(AbstractMap map, int day, int animalsNumber, int grassNumber, float averageEnergy,
+                     float averageLifetime, float averageChildrenNumber) {
         GridPane grid;
-        if (map instanceof WallMap) grid = this.wallGrid;
-        else grid = this.snakeGrid;
+        DoublePlot doublePlot;
+        Map<String, Plot> plots;
+        if (map instanceof WallMap) {
+            grid = this.wallGrid;
+            doublePlot = this.wallDoublePlot;
+            plots = this.wallPlots;
+        }
+        else {
+            grid = this.snakeGrid;
+            doublePlot = this.snakeDoublePlot;
+            plots = this.snakePlots;
+        }
 
         Platform.runLater(() -> {
             grid.getChildren().clear();
@@ -111,6 +153,10 @@ public class App extends Application implements IAppObserver {
             grid.getColumnConstraints().clear();
             grid.setGridLinesVisible(false);
             prepareGrid(grid, map);
+            doublePlot.updatePlot(day,animalsNumber,grassNumber);
+            plots.get("Average energy").updatePlot(day, averageEnergy);
+            plots.get("Average lifetime").updatePlot(day, averageLifetime);
+            plots.get("Average children number").updatePlot(day, averageChildrenNumber);
         });
     }
 
