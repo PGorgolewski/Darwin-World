@@ -14,9 +14,9 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
-import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
+import java.io.IOException;
 import java.util.*;
 
 //TODO autoresizing
@@ -41,6 +41,8 @@ public class App extends Application implements IAppObserver {
     private final Label wallMagicBorn = new Label("Magic born 0/3");
     private final Map<String, Plot> wallPlots = new HashMap<>();
     private final Map<String, Plot> snakePlots = new HashMap<>();
+    private final CSVHandler snakeCSVHandler = new CSVHandler("snake_map_stats");
+    private final CSVHandler wallCSVHandler = new CSVHandler("wall_map_stats");
     private Thread engineSnakeThread;
     private Thread engineWallThread;
 
@@ -54,10 +56,12 @@ public class App extends Application implements IAppObserver {
     public void start(Stage primaryStage) {
         Scene menuScene = createMenuScene(primaryStage);
         this.menuScene = menuScene;
+
         primaryStage.setOnCloseRequest(e -> {
             Platform.exit();
             System.exit(0);
         });
+
         primaryStage.setScene(menuScene);
         primaryStage.setTitle("Darwin World Simulation");
         primaryStage.show();
@@ -112,13 +116,12 @@ public class App extends Application implements IAppObserver {
         engineSnakeThread = new Thread(snakeEngine);
         engineWallThread = new Thread(wallEngine);
 
-        HBox startStopSnakeBox = prepareStartStopBox(snakeEngine);
-        HBox startStopWallBox = prepareStartStopBox(wallEngine);
-
-        VBox snakeStatsVBox = new VBox(40, snakeGrid, startStopSnakeBox,
+        VBox snakeStatsVBox = new VBox(40, prepareMapWithButtonsBox(snakeGrid,
+                prepareStartStopBox(snakeEngine, snakeCSVHandler, snakeDoublePlot, snakePlots )),
                 prepareGenotypeDominantAndMagicBornInfo(snakeGenotype, snakeMagicBorn, snakeEngine.getMap()),
                 this.prepareAllPlotsVBox(snakeDoublePlot, snakePlots));
-        VBox wallStatsVBox = new VBox(40, wallGrid, startStopWallBox,
+        VBox wallStatsVBox = new VBox(40, prepareMapWithButtonsBox(wallGrid,
+                prepareStartStopBox(wallEngine, wallCSVHandler, wallDoublePlot, wallPlots)),
                 prepareGenotypeDominantAndMagicBornInfo(wallGenotype, wallMagicBorn, wallEngine.getMap()),
                 this.prepareAllPlotsVBox(wallDoublePlot, wallPlots));
 
@@ -252,19 +255,47 @@ public class App extends Application implements IAppObserver {
         return new HBox(20, firstPlot.getLineChart(), secondPlot.getLineChart());
     }
 
-    public HBox prepareStartStopBox(SimulationEngine givenSimulation){
-        HBox box = new HBox(20, prepareStartButton(givenSimulation),
-                prepareStopButton(givenSimulation));
+    public HBox prepareMapWithButtonsBox(GridPane mapGrid, VBox buttonsBox){
+        HBox box = new HBox(20, mapGrid, buttonsBox);
         box.setAlignment(Pos.CENTER);
         return box;
+    }
+
+    public VBox prepareStartStopBox(SimulationEngine givenSimulation, CSVHandler handler, DoublePlot doublePlot,
+                                    Map<String, Plot> plots){
+        VBox box = new VBox(20, prepareStartButton(givenSimulation),
+                prepareStopButton(givenSimulation), prepareToCSVButton(givenSimulation, handler, doublePlot, plots));
+        box.setAlignment(Pos.CENTER);
+        return box;
+    }
+
+    public Button prepareToCSVButton(SimulationEngine givenSimulation, CSVHandler handler, DoublePlot doublePlot,
+                                     Map<String, Plot> plots){
+        Button button = new Button("Save to file");
+
+        button.setOnAction(click -> {
+            if (!givenSimulation.ifRunning){
+                handler.updateData("Animals", doublePlot.getSeries1AllValues(), doublePlot.getSeries1Average());
+                handler.updateData("Grass", doublePlot.getSeries2AllValues(), doublePlot.getSeries2Average());
+
+                plots.forEach((plotName,plot) -> {
+                    handler.updateData(plotName, plot.getAllValues(), plot.getSeriesAverage());
+                });
+                try {
+                    handler.createCSV();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+
+        return button;
     }
 
     public Button prepareStopButton(SimulationEngine givenSimulation){
         Button button = new Button("Stop Simulation");
 
-        button.setOnAction(click -> {
-            givenSimulation.setIfRunning(false);
-        });
+        button.setOnAction(click -> givenSimulation.setIfRunning(false));
 
         return button;
     }
@@ -272,9 +303,7 @@ public class App extends Application implements IAppObserver {
     public Button prepareStartButton(SimulationEngine givenSimulation){
         Button button = new Button("Start Simulation");
 
-        button.setOnAction(click -> {
-            givenSimulation.setIfRunning(true);
-        });
+        button.setOnAction(click -> givenSimulation.setIfRunning(true));
 
         return button;
     }
@@ -312,11 +341,13 @@ public class App extends Application implements IAppObserver {
             if (ifMagicBorn) magicBorn.setText("Magic born " + magicBornCounter + "/3");
         });
     }
+
     public void clearGrid(GridPane grid){
         grid.getChildren().clear();
         grid.getRowConstraints().clear();
         grid.getColumnConstraints().clear();
     }
+
     public void prepareGrid(GridPane grid, AbstractMap map) {
         int height = map.getHeight();
         int width = map.getWidth();

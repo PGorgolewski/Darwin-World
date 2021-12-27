@@ -4,6 +4,8 @@ import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class DoublePlot{
@@ -14,6 +16,8 @@ public class DoublePlot{
     private int firstDayInPlot = 0;
     private static final int maxPoints = 25;
     private final LineChart<Number, Number> lineChart;
+    private final List<Number> series1AllValues = new ArrayList<>();
+    private final List<Number> series2AllValues = new ArrayList<>();
 
     public DoublePlot(String series1Name, String series2Name, Number firstValueSeries1, Number firstValueSeries2){
         lineChart = new LineChart<>(xAxis, yAxis);
@@ -29,6 +33,8 @@ public class DoublePlot{
     public void updatePlot(int day, Number firstSeriesValue, Number secondSeriesValue){
         series1.getData().add(new XYChart.Data<>(day, firstSeriesValue));
         series2.getData().add(new XYChart.Data<>(day, secondSeriesValue));
+        series1AllValues.add(firstSeriesValue);
+        series2AllValues.add(secondSeriesValue);
 
         if (series1.getData().size() > maxPoints){
             series1.getData().remove(0);
@@ -41,5 +47,21 @@ public class DoublePlot{
 
     public LineChart<Number, Number> getLineChart() {
         return lineChart;
+    }
+
+    public List<Number> getSeries1AllValues() {
+        return series1AllValues;
+    }
+
+    public List<Number> getSeries2AllValues() {
+        return series2AllValues;
+    }
+
+    public Number getSeries1Average(){
+        return series1AllValues.stream().mapToDouble(Number::doubleValue).sum() / series1AllValues.size();
+    }
+
+    public Number getSeries2Average(){
+        return series2AllValues.stream().mapToDouble(Number::doubleValue).sum() / series2AllValues.size();
     }
 }

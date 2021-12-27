@@ -18,7 +18,7 @@ public class SimulationEngine implements Runnable{
     private final Set<Animal> deadAnimals = new HashSet<>();
     private final Set<Vector2d> positionsWithAnimalAndGrass = new HashSet<>();
     private final IAppObserver observer;
-    private int moveDelay;
+    private final int moveDelay;
     private int currDay=0;
     private int currAnimalsNumber;
     private int deadAnimalsCounter=0;
