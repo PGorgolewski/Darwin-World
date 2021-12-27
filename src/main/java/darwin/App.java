@@ -77,6 +77,8 @@ public class App extends Application implements IAppObserver {
             } catch (Exception e) {
                 e.printStackTrace();
             }
+            clearGrid(wallGrid);
+            clearGrid(snakeGrid);
             Scene simulationScene = createSimulationScene(menuArgs, primaryStage);
             primaryStage.setScene(simulationScene);
             engineSnakeThread.start();
@@ -300,9 +302,7 @@ public class App extends Application implements IAppObserver {
         }
 
         Platform.runLater(() -> {
-            grid.getChildren().clear();
-            grid.getRowConstraints().clear();
-            grid.getColumnConstraints().clear();
+            clearGrid(grid);
             prepareGrid(grid, map);
             doublePlot.updatePlot(day,animalsNumber,grassNumber);
             plots.get("Average energy").updatePlot(day, averageEnergy);
@@ -312,7 +312,11 @@ public class App extends Application implements IAppObserver {
             if (ifMagicBorn) magicBorn.setText("Magic born " + magicBornCounter + "/3");
         });
     }
-
+    public void clearGrid(GridPane grid){
+        grid.getChildren().clear();
+        grid.getRowConstraints().clear();
+        grid.getColumnConstraints().clear();
+    }
     public void prepareGrid(GridPane grid, AbstractMap map) {
         int height = map.getHeight();
         int width = map.getWidth();
