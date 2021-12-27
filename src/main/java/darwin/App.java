@@ -8,6 +8,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
@@ -18,12 +19,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-
-//TODO zrobParser
-//TODO zrob statystki
 //TODO zatrzymywanie i wznawianie
+//TODO autoresizing and legend for map
+//TODO zrobParser
+
 //TODO wskazywanie pojedynczego zwierza po zatrzymaniu
-//TODO magiczne rodzenie
 //TODO zapisywanie statystyk do pliku w csv formacie
 //TODO ma byc uruchamiane za pomoca komendy gradla
 public class App extends Application implements IAppObserver {
@@ -31,9 +31,14 @@ public class App extends Application implements IAppObserver {
     GridPane wallGrid = new GridPane();
     SimulationEngine snakeEngine;
     SimulationEngine wallEngine;
+    private boolean ifMagicBorn;
     private int startEnergy;
     private DoublePlot snakeDoublePlot;
     private DoublePlot wallDoublePlot;
+    private final Label snakeGenotype = new Label();
+    private final Label wallGenotype = new Label();
+    private final Label snakeMagicBorns = new Label("Magic borns 0/3");
+    private final Label wallMagicBorns = new Label("Magic borns 0/3");
     private final Map<String, Plot> wallPlots = new HashMap<>();
     private final Map<String, Plot> snakePlots = new HashMap<>();
 
@@ -45,11 +50,12 @@ public class App extends Application implements IAppObserver {
         int startEnergy = 200;
         int grassEnergy = 40;
         int moveEnergy = 5;
+        this.ifMagicBorn = false;
         this.startEnergy = startEnergy;
         this.snakeEngine = new SimulationEngine(width, height, jungleRatio, startAnimalsNumber,
-                startEnergy, moveEnergy, grassEnergy, false, this);
+                startEnergy, moveEnergy, grassEnergy, ifMagicBorn,false, this);
         this.wallEngine = new SimulationEngine(width, height, jungleRatio, startAnimalsNumber,
-                startEnergy, moveEnergy, grassEnergy, true, this);
+                startEnergy, moveEnergy, grassEnergy, ifMagicBorn, true, this);
         this.snakeDoublePlot = new DoublePlot("Animals","Grasses", startAnimalsNumber, 0);
         this.wallDoublePlot = new DoublePlot("Animals","Grasses", startAnimalsNumber, 0);
         this.addPlots(this.wallPlots);
@@ -63,34 +69,46 @@ public class App extends Application implements IAppObserver {
     }
 
     public void start(Stage primaryStage) {
-        prepareGrid(this.snakeGrid, this.snakeEngine.getMap());
-        prepareGrid(this.wallGrid, this.wallEngine.getMap());
+        prepareGrid(snakeGrid, snakeEngine.getMap());
+        prepareGrid(wallGrid, wallEngine.getMap());
 
-        Thread engineSnakeThread = new Thread(this.snakeEngine);
-        Thread engineWallThread = new Thread(this.wallEngine);
+        Thread engineSnakeThread = new Thread(snakeEngine);
+        Thread engineWallThread = new Thread(wallEngine);
 
-        HBox startStopSnakeBox = this.prepareStartStopBox(engineSnakeThread);
-        HBox startStopWallBox = this.prepareStartStopBox(engineWallThread);
+        HBox startStopSnakeBox = prepareStartStopBox(engineSnakeThread);
+        HBox startStopWallBox = prepareStartStopBox(engineWallThread);
 
-
-        VBox snakeVBox = new VBox(40, this.snakeGrid, startStopSnakeBox,
-                this.prepareAllPlotsVBox(this.snakeDoublePlot, this.snakePlots));
-        VBox wallVBox = new VBox(40, this.wallGrid, startStopWallBox,
-                this.prepareAllPlotsVBox(this.wallDoublePlot, this.wallPlots));
+        VBox snakeVBox = new VBox(40, snakeGrid, startStopSnakeBox,
+                prepareGenotypeDominantAndMagicBornInfo(snakeGenotype, snakeMagicBorns, snakeEngine.getMap()),
+                this.prepareAllPlotsVBox(snakeDoublePlot, snakePlots));
+        VBox wallVBox = new VBox(40, wallGrid, startStopWallBox,
+                prepareGenotypeDominantAndMagicBornInfo(wallGenotype, wallMagicBorns, wallEngine.getMap()),
+                this.prepareAllPlotsVBox(wallDoublePlot, wallPlots));
 
         HBox hBox = new HBox(40, snakeVBox, wallVBox);
         hBox.setAlignment(Pos.CENTER);
-        GridPane.setHalignment(this.snakeGrid, HPos.CENTER);
-        GridPane.setHalignment(this.wallGrid, HPos.CENTER);
+        snakeGrid.setAlignment(Pos.CENTER);
+        wallGrid.setAlignment(Pos.CENTER);
         Scene scene = new Scene(hBox ,800, 600);
         primaryStage.setScene(scene);
         primaryStage.setTitle("Darwin World Simulation");
         primaryStage.show();
     }
 
+    public HBox prepareGenotypeDominantAndMagicBornInfo(Label givenGenotypeLabel, Label givenMagicBornLabel, AbstractMap map){
+        givenGenotypeLabel.setText("Dominant genotype: " + map.getTheMostFrequentGenotype().toString());
+        HBox hBox;
+        if (ifMagicBorn)
+            hBox = new HBox(20, givenGenotypeLabel, givenMagicBornLabel);
+        else
+            hBox = new HBox(20, givenGenotypeLabel);
+        hBox.setAlignment(Pos.CENTER);
+        return hBox;
+    }
+
     public VBox prepareAllPlotsVBox(DoublePlot givenDoublePlot, Map<String, Plot> givenPlots){
-        return new VBox(40, this.preparePlotHBox(givenDoublePlot, givenPlots.get("Average energy")),
-                this.preparePlotHBox(givenPlots.get("Average lifetime"), givenPlots.get("Average children number")));
+        return new VBox(40, preparePlotHBox(givenDoublePlot, givenPlots.get("Average energy")),
+                preparePlotHBox(givenPlots.get("Average lifetime"), givenPlots.get("Average children number")));
     }
 
     public HBox preparePlotHBox(DoublePlot doublePlot, Plot plot){
@@ -102,8 +120,8 @@ public class App extends Application implements IAppObserver {
     }
 
     public HBox prepareStartStopBox(Thread givenSimulationThread){
-        HBox box = new HBox(20, this.prepareStartButton(givenSimulationThread),
-                this.prepareStopButton(givenSimulationThread));
+        HBox box = new HBox(20, prepareStartButton(givenSimulationThread),
+                prepareStopButton(givenSimulationThread));
         box.setAlignment(Pos.CENTER);
         return box;
     }
@@ -132,19 +150,25 @@ public class App extends Application implements IAppObserver {
     }
 
     public void show(AbstractMap map, int day, int animalsNumber, int grassNumber, float averageEnergy,
-                     float averageLifetime, float averageChildrenNumber) {
+                     float averageLifetime, float averageChildrenNumber, int magicBornCounter) {
         GridPane grid;
         DoublePlot doublePlot;
         Map<String, Plot> plots;
+        Label magicBorn;
+        Label genotype;
         if (map instanceof WallMap) {
-            grid = this.wallGrid;
-            doublePlot = this.wallDoublePlot;
-            plots = this.wallPlots;
+            grid = wallGrid;
+            doublePlot = wallDoublePlot;
+            plots = wallPlots;
+            magicBorn = wallMagicBorns;
+            genotype = wallGenotype;
         }
         else {
-            grid = this.snakeGrid;
-            doublePlot = this.snakeDoublePlot;
-            plots = this.snakePlots;
+            grid = snakeGrid;
+            doublePlot = snakeDoublePlot;
+            plots = snakePlots;
+            magicBorn = snakeMagicBorns;
+            genotype = snakeGenotype;
         }
 
         Platform.runLater(() -> {
@@ -157,6 +181,8 @@ public class App extends Application implements IAppObserver {
             plots.get("Average energy").updatePlot(day, averageEnergy);
             plots.get("Average lifetime").updatePlot(day, averageLifetime);
             plots.get("Average children number").updatePlot(day, averageChildrenNumber);
+            genotype.setText("Dominant genotype: " + map.getTheMostFrequentGenotype().toString());
+            if (ifMagicBorn) magicBorn.setText("Magic borns " + magicBornCounter + "/3");
         });
     }
 
@@ -167,7 +193,7 @@ public class App extends Application implements IAppObserver {
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 Vector2d currPos = new Vector2d(x,y);
-                Circle circle = this.getCircleForTheStrongestAnimal(currPos, map);
+                Circle circle = getCircleForTheStrongestAnimal(currPos, map);
                 Color backgroundColor = Color.LIGHTGREEN;
 
                 if (map.isGrassOnPosition(new Vector2d(x,y))){
@@ -197,12 +223,12 @@ public class App extends Application implements IAppObserver {
 
     public Circle getCircleForTheStrongestAnimal(Vector2d position, AbstractMap map) {
         List<Animal> positionAnimals = map.getSortedListOfAnimalsOnPosition(position);
-        return (positionAnimals.size() != 0) ? this.getCircleForGivenAnimal(positionAnimals.get(0)) : null;
+        return (positionAnimals.size() != 0) ? getCircleForGivenAnimal(positionAnimals.get(0)) : null;
     }
 
     public Circle getCircleForGivenAnimal(Animal animal){
         Circle animalCircle = new Circle(6);
-        animalCircle.setFill(animal.toColor(this.startEnergy));
+        animalCircle.setFill(animal.toColor(startEnergy));
         return animalCircle;
     }
 }

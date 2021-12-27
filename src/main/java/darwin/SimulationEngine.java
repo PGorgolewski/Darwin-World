@@ -8,7 +8,11 @@ public class SimulationEngine implements Runnable{
     private final int moveEnergy;
     private final int grassEnergy;
     private final float minReproductionEnergy;
+    private final int startEnergy;
+    private final boolean ifMagicBorn;
+    private int magicBornCounter = 0;
     private final AbstractMap map;
+    boolean ifRunning = true;
     private final Set<Animal> allAnimals = new HashSet<>();
     private final Set<Animal> deadAnimals = new HashSet<>();
     private final Set<Vector2d> positionsWithAnimalAndGrass = new HashSet<>();
@@ -20,15 +24,17 @@ public class SimulationEngine implements Runnable{
     private float averageLifetime = 0;
 
     public SimulationEngine(int mapWidth, int mapHeight, float jungleRatio, int startingAnimalsNumber, int startEnergy,
-                            int moveEnergy, int grassEnergy, Boolean ifWallMap, IAppObserver observer){
+                            int moveEnergy, int grassEnergy, boolean ifMagicBorn, boolean ifWallMap, IAppObserver observer){
         if (ifWallMap)  this.map = new WallMap(mapWidth, mapHeight, jungleRatio);
         else this.map = new SnakeMap(mapWidth, mapHeight, jungleRatio);
         this.moveEnergy = moveEnergy;
         this.grassEnergy = grassEnergy;
+        this.startEnergy = startEnergy;
         this.minReproductionEnergy = (float) startEnergy / 2;
         this.observer = observer;
         this.createFirstAnimals(startingAnimalsNumber, startEnergy);
         this.currAnimalsNumber = startingAnimalsNumber;
+        this.ifMagicBorn = ifMagicBorn;
     }
 
     @Override
@@ -43,7 +49,33 @@ public class SimulationEngine implements Runnable{
         }
     }
 
+    public boolean magicBorn(){
+        List<Animal> parents = this.allAnimals.stream().
+                filter(a -> !deadAnimals.contains(a)).
+                collect(Collectors.toCollection(ArrayList::new));
+
+        if (parents.size() != 5) return false;
+        magicBornCounter++;
+        List<Vector2d> positionsWithoutAnimals = this.map.getPositionsWithoutAnimals();
+        magicReproduction(positionsWithoutAnimals, parents);
+        return true;
+    }
+
+    protected void magicReproduction(List<Vector2d> freePositions, List<Animal> parents){
+        for (Animal parent: parents){
+            int randomNumber = ThreadLocalRandom.current().nextInt(0, freePositions.size());
+            Animal magicBabyAnimal = new Animal(freePositions.get(randomNumber), this.map, parent, this.startEnergy,
+                    this.map, this.currDay);
+            this.allAnimals.add(magicBabyAnimal);
+            this.map.placeElement(magicBabyAnimal);
+            this.currAnimalsNumber++;
+            freePositions.remove(randomNumber);
+            }
+
+        }
+
     public void animalReproduction(){
+        if (ifMagicBorn && magicBornCounter < 3) magicBorn();
         Map<Vector2d, List<Animal>> positionsByAnimals = this.map.getPositionsByAnimalsMap(2,
                 this.minReproductionEnergy);
 
@@ -167,9 +199,9 @@ public class SimulationEngine implements Runnable{
     public void updateMap(){
         this.currDay++;
         int currGrassNumber = this.map.grassMap.size();
-        //TODO add averageLifetime, averageChildrenNumber, averageCosTam
+
         this.observer.show(this.map, this.currDay, this.currAnimalsNumber, currGrassNumber, getAverageEnergy(),
-                this.averageLifetime, getAverageChildrenNumber());
+                this.averageLifetime, getAverageChildrenNumber(), this.magicBornCounter);
 
         try {
             Thread.sleep(this.moveDelay);

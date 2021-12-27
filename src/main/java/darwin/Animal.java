@@ -41,12 +41,12 @@ public class Animal extends AbstractMapElement {
     }
 
     //MAGIC BORN
-    public Animal(Vector2d startPosition, AbstractMap map, Animal animalToCopy, int maxEnergy, IObserver observer, int birthDay){
+    public Animal(Vector2d startPosition, AbstractMap map, Animal animalToCopy, int startEnergy, IObserver observer, int birthDay){
         this.position = startPosition;
         this.orient = animalToCopy.getOrient();
         this.map = map;
         this.genes.addAll(animalToCopy.getGenes());
-        this.energy = maxEnergy;
+        this.energy = startEnergy;
         this.observer = observer;
         this.birthDay = birthDay;
     }

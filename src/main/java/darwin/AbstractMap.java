@@ -3,8 +3,6 @@ package darwin;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 abstract class AbstractMap implements IObserver{
     protected final int width;
@@ -15,6 +13,7 @@ abstract class AbstractMap implements IObserver{
     protected final Set<Vector2d> stepFreePositions = new HashSet<>();
     protected final Map<Vector2d, Grass> grassMap = new HashMap<>();
     protected final Map<Vector2d, Set<Animal>> animalMap = new HashMap<>();
+    protected final Map<List<Integer>, Integer> genotypeOccurences = new HashMap<>();
 
     protected AbstractMap(int width, int height, float jungleRatio) {
         this.width = width;
@@ -65,6 +64,19 @@ abstract class AbstractMap implements IObserver{
         }
     }
 
+    protected void addToGenotypeMap(List<Integer> genes){
+        if (this.genotypeOccurences.containsKey(genes))
+            this.genotypeOccurences.replace(genes, this.genotypeOccurences.get(genes) + 1);
+        else
+            this.genotypeOccurences.put(genes, 1);
+    }
+
+    protected void removeFromGenotypeMap(List<Integer> genes){
+        this.genotypeOccurences.replace(genes, this.genotypeOccurences.get(genes) - 1);
+        if (this.genotypeOccurences.get(genes) == 0)
+            this.genotypeOccurences.remove(genes);
+    }
+
     protected void placeElement(AbstractMapElement mapElement){
         Vector2d elementVector = mapElement.getPosition();
         if (isPositionInJungle(elementVector)){
@@ -72,6 +84,7 @@ abstract class AbstractMap implements IObserver{
         }else {
             this.placeElementForGivenMap(mapElement, elementVector,  this.stepFreePositions);
         }
+        if (mapElement instanceof Animal) this.addToGenotypeMap(((Animal) mapElement).getGenes());
     }
 
     protected void placeElementForGivenMap(AbstractMapElement mapElement, Vector2d elementVector, Set<Vector2d> givenSet){
@@ -89,6 +102,7 @@ abstract class AbstractMap implements IObserver{
         }else {
             this.removeGivenElement(mapElement, elementPosition, this.stepFreePositions);
         }
+        if (mapElement instanceof Animal) this.removeFromGenotypeMap(((Animal) mapElement).getGenes());
     }
 
     protected void removeGivenElement(AbstractMapElement mapElement, Vector2d elementPosition,
@@ -125,6 +139,7 @@ abstract class AbstractMap implements IObserver{
                 .sorted((a1, a2) -> Float.compare(a1.getEnergy(), a2.getEnergy()))
                 .collect(Collectors.toCollection(ArrayList::new));
     }
+
     protected Map<Vector2d, List<Animal>> getPositionsByAnimalsMap(int minAnimals, float minEnergy){
         Map<Vector2d, List<Animal>> positionsByAnimals = new HashMap<>();
         this.animalMap.forEach((k,v) -> {
@@ -137,6 +152,30 @@ abstract class AbstractMap implements IObserver{
             }
         });
         return positionsByAnimals;
+    }
+
+    protected List<Vector2d> getPositionsWithoutAnimals(){
+        List<Vector2d> positionsWithoutAnimals = new ArrayList<>();
+        this.animalMap.forEach((k,v) -> {
+            if (v.size() == 0){
+                positionsWithoutAnimals.add(k);
+            }
+        });
+        return positionsWithoutAnimals;
+    }
+
+    protected List<Integer> getTheMostFrequentGenotype(){
+        List<Integer> theMostFrequent = new ArrayList<>();
+        int maxOccurrences = 0;
+
+        for (List<Integer> genotype: this.genotypeOccurences.keySet()){
+            if (genotypeOccurences.get(genotype) > maxOccurrences){
+                maxOccurrences = genotypeOccurences.get(genotype);
+                theMostFrequent = genotype;
+            }
+        }
+
+        return theMostFrequent;
     }
 
     public Vector2d getJungleLowerLeft() {
