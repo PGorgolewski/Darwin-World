@@ -9,20 +9,16 @@ import javafx.scene.Scene;
 
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
-//TODO zatrzymywanie i wznawianie
 //TODO autoresizing and legend for map
-//TODO zrobParser
-
 //TODO wskazywanie pojedynczego zwierza po zatrzymaniu
 //TODO zapisywanie statystyk do pliku w csv formacie
 //TODO ma byc uruchamiane za pomoca komendy gradla
@@ -33,34 +29,19 @@ public class App extends Application implements IAppObserver {
     SimulationEngine wallEngine;
     private boolean ifMagicBorn;
     private int startEnergy;
+    private final Map<String, String> defaultMenuValues = createDefaultMenuValues();
+    private final Map<String, TextField> menuTextFields = new HashMap<>();
     private DoublePlot snakeDoublePlot;
     private DoublePlot wallDoublePlot;
     private final Label snakeGenotype = new Label();
     private final Label wallGenotype = new Label();
-    private final Label snakeMagicBorns = new Label("Magic borns 0/3");
-    private final Label wallMagicBorns = new Label("Magic borns 0/3");
+    private final Label snakeMagicBorn = new Label("Magic born 0/3");
+    private final Label wallMagicBorn = new Label("Magic born 0/3");
     private final Map<String, Plot> wallPlots = new HashMap<>();
     private final Map<String, Plot> snakePlots = new HashMap<>();
+    private Thread engineSnakeThread;
+    private Thread engineWallThread;
 
-    public void init() {
-        int width = 10;
-        int height = 10;
-        float jungleRatio = 0.4f;
-        int startAnimalsNumber = 20;
-        int startEnergy = 200;
-        int grassEnergy = 40;
-        int moveEnergy = 5;
-        this.ifMagicBorn = false;
-        this.startEnergy = startEnergy;
-        this.snakeEngine = new SimulationEngine(width, height, jungleRatio, startAnimalsNumber,
-                startEnergy, moveEnergy, grassEnergy, ifMagicBorn,false, this);
-        this.wallEngine = new SimulationEngine(width, height, jungleRatio, startAnimalsNumber,
-                startEnergy, moveEnergy, grassEnergy, ifMagicBorn, true, this);
-        this.snakeDoublePlot = new DoublePlot("Animals","Grasses", startAnimalsNumber, 0);
-        this.wallDoublePlot = new DoublePlot("Animals","Grasses", startAnimalsNumber, 0);
-        this.addPlots(this.wallPlots);
-        this.addPlots(this.snakePlots);
-    }
 
     public void addPlots(Map<String, Plot> givenMap){
         givenMap.put("Average energy", new Plot("Average energy", startEnergy));
@@ -69,30 +50,138 @@ public class App extends Application implements IAppObserver {
     }
 
     public void start(Stage primaryStage) {
+        Scene menuScene = createMenuScene(primaryStage);
+        primaryStage.setScene(menuScene);
+        primaryStage.setTitle("Darwin World Simulation");
+        primaryStage.show();
+    }
+
+    public Scene createMenuScene(Stage primaryStage){
+        return new Scene(createVBoxMenu(primaryStage));
+    }
+
+    public VBox createVBoxMenu(Stage primaryStage){
+        Button createSimulationButton = new Button("Create Simulation");
+
+        createSimulationButton.setOnAction(click -> {
+            Map<String, Number> menuArgs = null;
+            try {
+                menuArgs = OptionParser.parseArguments(menuTextFields);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            Scene simulationScene = createSimulationScene(menuArgs);
+            primaryStage.setScene(simulationScene);
+            engineSnakeThread.start();
+            engineWallThread.start();
+        });
+
+        Button exitButton = new Button("Exit");
+
+        exitButton.setOnAction(click -> {
+            Platform.exit();
+        });
+
+        HBox buttonBox = new HBox(40, createSimulationButton, exitButton);
+        buttonBox.setAlignment(Pos.CENTER);
+        return new VBox(40,
+                createVBoxWithLabelsAndTextFields("Map Properties",
+                        new String[]{"Map height", "Map width", "Jungle ratio"}),
+                createVBoxWithLabelsAndTextFields("Menu Elements Properties",
+                        new String[]{"Grass energy", "Animal start energy", "Animal move energy"}),
+                createVBoxWithLabelsAndTextFields("Others",
+                        new String[]{"Start animals number", "Refresh time (in ms)", "Use magic born [yes/no]"}),
+                buttonBox);
+    }
+
+    public Scene createSimulationScene(Map<String, Number> menuArgs){
+        prepareSimulation(menuArgs);
         prepareGrid(snakeGrid, snakeEngine.getMap());
         prepareGrid(wallGrid, wallEngine.getMap());
 
-        Thread engineSnakeThread = new Thread(snakeEngine);
-        Thread engineWallThread = new Thread(wallEngine);
+        engineSnakeThread = new Thread(snakeEngine);
+        engineWallThread = new Thread(wallEngine);
 
-        HBox startStopSnakeBox = prepareStartStopBox(engineSnakeThread);
-        HBox startStopWallBox = prepareStartStopBox(engineWallThread);
+        HBox startStopSnakeBox = prepareStartStopBox(snakeEngine);
+        HBox startStopWallBox = prepareStartStopBox(wallEngine);
 
         VBox snakeVBox = new VBox(40, snakeGrid, startStopSnakeBox,
-                prepareGenotypeDominantAndMagicBornInfo(snakeGenotype, snakeMagicBorns, snakeEngine.getMap()),
+                prepareGenotypeDominantAndMagicBornInfo(snakeGenotype, snakeMagicBorn, snakeEngine.getMap()),
                 this.prepareAllPlotsVBox(snakeDoublePlot, snakePlots));
         VBox wallVBox = new VBox(40, wallGrid, startStopWallBox,
-                prepareGenotypeDominantAndMagicBornInfo(wallGenotype, wallMagicBorns, wallEngine.getMap()),
+                prepareGenotypeDominantAndMagicBornInfo(wallGenotype, wallMagicBorn, wallEngine.getMap()),
                 this.prepareAllPlotsVBox(wallDoublePlot, wallPlots));
 
         HBox hBox = new HBox(40, snakeVBox, wallVBox);
         hBox.setAlignment(Pos.CENTER);
         snakeGrid.setAlignment(Pos.CENTER);
         wallGrid.setAlignment(Pos.CENTER);
-        Scene scene = new Scene(hBox ,800, 600);
-        primaryStage.setScene(scene);
-        primaryStage.setTitle("Darwin World Simulation");
-        primaryStage.show();
+        return new Scene(hBox);
+    }
+
+    public void prepareSimulation(Map<String, Number> menuArgs){
+        int width = (int) menuArgs.get("Map width");
+        int height = (int) menuArgs.get("Map height");
+        float jungleRatio = (float) menuArgs.get("Jungle ratio");
+        int startAnimalsNumber = (int) menuArgs.get("Start animals number");
+        int grassEnergy = (int) menuArgs.get("Grass energy");
+        int moveEnergy = (int) menuArgs.get("Animal move energy");
+        this.ifMagicBorn = (int) menuArgs.get("Use magic born [yes/no]") == 1;
+        this.startEnergy = (int) menuArgs.get("Animal start energy");
+        int delay = (int) menuArgs.get("Refresh time (in ms)");
+
+        this.snakeEngine = new SimulationEngine(width, height, jungleRatio, startAnimalsNumber,
+                startEnergy, moveEnergy, grassEnergy, delay, ifMagicBorn,false, this);
+        this.wallEngine = new SimulationEngine(width, height, jungleRatio, startAnimalsNumber,
+                startEnergy, moveEnergy, grassEnergy, delay, ifMagicBorn, true, this);
+
+        this.snakeDoublePlot = new DoublePlot("Animals","Grasses", startAnimalsNumber, 0);
+        this.wallDoublePlot = new DoublePlot("Animals","Grasses", startAnimalsNumber, 0);
+        
+        this.addPlots(this.wallPlots);
+        this.addPlots(this.snakePlots);
+    }
+
+    public VBox createVBoxWithLabelsAndTextFields(String primaryLabel, String[] textFieldNames){
+        Label label = new Label(primaryLabel);
+        label.setStyle("-fx-font-weight: bold");
+        VBox vbox = new VBox(20, label, createLabelsWithTextFields(textFieldNames));
+        vbox.setAlignment(Pos.CENTER);
+        return vbox;
+    }
+
+    public VBox createLabelsWithTextFields(String[] properties){
+        VBox vBox = new VBox(30);
+        vBox.setAlignment(Pos.CENTER);
+        for (String oneProperty: properties){
+            Label label = new Label(oneProperty);
+            label.setStyle("-fx-font-weight: bold");
+            label.setAlignment(Pos.CENTER);
+
+            TextField textField = new TextField(defaultMenuValues.get(oneProperty));
+            textField.setAlignment(Pos.CENTER);
+
+            menuTextFields.put(oneProperty, textField);
+            HBox hbox = new HBox(20, label, textField);
+            hbox.setAlignment(Pos.CENTER);
+            vBox.getChildren().add(hbox);
+        }
+        return vBox;
+    }
+
+    public Map<String,String> createDefaultMenuValues(){
+        Map<String,String> defaultMenuValues = new HashMap();
+        defaultMenuValues.put("Map height", "10");
+        defaultMenuValues.put("Map width", "10");
+        defaultMenuValues.put("Jungle ratio", "0.4");
+        defaultMenuValues.put("Grass energy", "15");
+        defaultMenuValues.put("Animal start energy", "200");
+        defaultMenuValues.put("Animal move energy", "5");
+        defaultMenuValues.put("Use magic born [yes/no]", "no");
+        defaultMenuValues.put("Start animals number", "20");
+        defaultMenuValues.put("Refresh time (in ms)", "300");
+
+        return defaultMenuValues;
     }
 
     public HBox prepareGenotypeDominantAndMagicBornInfo(Label givenGenotypeLabel, Label givenMagicBornLabel, AbstractMap map){
@@ -119,31 +208,28 @@ public class App extends Application implements IAppObserver {
         return new HBox(20, firstPlot.getLineChart(), secondPlot.getLineChart());
     }
 
-    public HBox prepareStartStopBox(Thread givenSimulationThread){
-        HBox box = new HBox(20, prepareStartButton(givenSimulationThread),
-                prepareStopButton(givenSimulationThread));
+    public HBox prepareStartStopBox(SimulationEngine givenSimulation){
+        HBox box = new HBox(20, prepareStartButton(givenSimulation),
+                prepareStopButton(givenSimulation));
         box.setAlignment(Pos.CENTER);
         return box;
     }
-    public Button prepareStopButton(Thread givenSimulationThread){
+
+    public Button prepareStopButton(SimulationEngine givenSimulation){
         Button button = new Button("Stop Simulation");
 
         button.setOnAction(click -> {
-            try {
-                Thread.sleep(10000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            givenSimulation.setIfRunning(false);
         });
 
         return button;
     }
 
-    public Button prepareStartButton(Thread givenSimulationThread){
+    public Button prepareStartButton(SimulationEngine givenSimulation){
         Button button = new Button("Start Simulation");
 
         button.setOnAction(click -> {
-            givenSimulationThread.start();
+            givenSimulation.setIfRunning(true);
         });
 
         return button;
@@ -160,14 +246,14 @@ public class App extends Application implements IAppObserver {
             grid = wallGrid;
             doublePlot = wallDoublePlot;
             plots = wallPlots;
-            magicBorn = wallMagicBorns;
+            magicBorn = wallMagicBorn;
             genotype = wallGenotype;
         }
         else {
             grid = snakeGrid;
             doublePlot = snakeDoublePlot;
             plots = snakePlots;
-            magicBorn = snakeMagicBorns;
+            magicBorn = snakeMagicBorn;
             genotype = snakeGenotype;
         }
 
@@ -175,19 +261,17 @@ public class App extends Application implements IAppObserver {
             grid.getChildren().clear();
             grid.getRowConstraints().clear();
             grid.getColumnConstraints().clear();
-            grid.setGridLinesVisible(false);
             prepareGrid(grid, map);
             doublePlot.updatePlot(day,animalsNumber,grassNumber);
             plots.get("Average energy").updatePlot(day, averageEnergy);
             plots.get("Average lifetime").updatePlot(day, averageLifetime);
             plots.get("Average children number").updatePlot(day, averageChildrenNumber);
             genotype.setText("Dominant genotype: " + map.getTheMostFrequentGenotype().toString());
-            if (ifMagicBorn) magicBorn.setText("Magic borns " + magicBornCounter + "/3");
+            if (ifMagicBorn) magicBorn.setText("Magic born " + magicBornCounter + "/3");
         });
     }
 
     public void prepareGrid(GridPane grid, AbstractMap map) {
-        grid.setGridLinesVisible(true);
         int height = map.getHeight();
         int width = map.getWidth();
         for (int y = 0; y < height; y++) {

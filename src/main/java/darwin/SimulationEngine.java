@@ -12,19 +12,21 @@ public class SimulationEngine implements Runnable{
     private final boolean ifMagicBorn;
     private int magicBornCounter = 0;
     private final AbstractMap map;
-    boolean ifRunning = true;
+    boolean ifRunning = false;
+    boolean finished = false;
     private final Set<Animal> allAnimals = new HashSet<>();
     private final Set<Animal> deadAnimals = new HashSet<>();
     private final Set<Vector2d> positionsWithAnimalAndGrass = new HashSet<>();
     private final IAppObserver observer;
-    private final int moveDelay = 300;
+    private int moveDelay;
     private int currDay=0;
     private int currAnimalsNumber;
     private int deadAnimalsCounter=0;
     private float averageLifetime = 0;
 
     public SimulationEngine(int mapWidth, int mapHeight, float jungleRatio, int startingAnimalsNumber, int startEnergy,
-                            int moveEnergy, int grassEnergy, boolean ifMagicBorn, boolean ifWallMap, IAppObserver observer){
+                            int moveEnergy, int grassEnergy, int moveDelay, boolean ifMagicBorn, boolean ifWallMap,
+                            IAppObserver observer){
         if (ifWallMap)  this.map = new WallMap(mapWidth, mapHeight, jungleRatio);
         else this.map = new SnakeMap(mapWidth, mapHeight, jungleRatio);
         this.moveEnergy = moveEnergy;
@@ -33,13 +35,17 @@ public class SimulationEngine implements Runnable{
         this.minReproductionEnergy = (float) startEnergy / 2;
         this.observer = observer;
         this.createFirstAnimals(startingAnimalsNumber, startEnergy);
+        this.moveDelay = moveDelay;
         this.currAnimalsNumber = startingAnimalsNumber;
         this.ifMagicBorn = ifMagicBorn;
     }
 
     @Override
     public void run() {
-        while(true){
+        int counter = 0;
+        while(allAnimals.size() > 0 && !finished){
+            System.out.println(counter++);
+            this.waitForStartButton();
             this.deleteDeadAnimals();
             this.moveEachAnimal();
             this.eatGrasses();
@@ -49,16 +55,27 @@ public class SimulationEngine implements Runnable{
         }
     }
 
-    public boolean magicBorn(){
+    public void waitForStartButton(){
+        synchronized (this){
+            while (!ifRunning){
+                try {
+                    wait();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    public void magicBorn(){
         List<Animal> parents = this.allAnimals.stream().
                 filter(a -> !deadAnimals.contains(a)).
                 collect(Collectors.toCollection(ArrayList::new));
 
-        if (parents.size() != 5) return false;
+        if (parents.size() != 5) return;
         magicBornCounter++;
         List<Vector2d> positionsWithoutAnimals = this.map.getPositionsWithoutAnimals();
         magicReproduction(positionsWithoutAnimals, parents);
-        return true;
     }
 
     protected void magicReproduction(List<Vector2d> freePositions, List<Animal> parents){
@@ -162,9 +179,10 @@ public class SimulationEngine implements Runnable{
     public void createFirstAnimals(int startingAnimalsNumber, int startEnergy){
         Set<Vector2d> allFreePositionsSet = new HashSet<>(this.map.jungleFreePositions);
         allFreePositionsSet.addAll(this.map.stepFreePositions);
-
+        System.out.println(allFreePositionsSet);
         for (int i = 0; i < startingAnimalsNumber; i++){
             List<Vector2d> allFreePositionsList = new ArrayList<>(allFreePositionsSet);
+            System.out.println(allFreePositionsList.size());
             int randomNum = ThreadLocalRandom.current().nextInt(0, allFreePositionsList.size());
             Animal newAnimal = new Animal(new Vector2d(allFreePositionsList.get(randomNum)), this.map, startEnergy, this.map, this.currDay);
             this.map.placeElement(newAnimal);
@@ -214,4 +232,11 @@ public class SimulationEngine implements Runnable{
         return map;
     }
 
+    public void setIfRunning(boolean ifRunning) {
+        synchronized (this){
+            this.ifRunning = ifRunning;
+            notifyAll();
+        }
+
+    }
 }
