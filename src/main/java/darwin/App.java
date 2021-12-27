@@ -13,12 +13,13 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
 import java.util.*;
 
-//TODO autoresizing and legend for map
+//TODO autoresizing
 //TODO wskazywanie pojedynczego zwierza po zatrzymaniu
 //TODO zapisywanie statystyk do pliku w csv formacie
 //TODO ma byc uruchamiane za pomoca komendy gradla
@@ -31,6 +32,7 @@ public class App extends Application implements IAppObserver {
     private int startEnergy;
     private final Map<String, String> defaultMenuValues = createDefaultMenuValues();
     private final Map<String, TextField> menuTextFields = new HashMap<>();
+    private Scene menuScene;
     private DoublePlot snakeDoublePlot;
     private DoublePlot wallDoublePlot;
     private final Label snakeGenotype = new Label();
@@ -51,6 +53,11 @@ public class App extends Application implements IAppObserver {
 
     public void start(Stage primaryStage) {
         Scene menuScene = createMenuScene(primaryStage);
+        this.menuScene = menuScene;
+        primaryStage.setOnCloseRequest(e -> {
+            Platform.exit();
+            System.exit(0);
+        });
         primaryStage.setScene(menuScene);
         primaryStage.setTitle("Darwin World Simulation");
         primaryStage.show();
@@ -70,7 +77,7 @@ public class App extends Application implements IAppObserver {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            Scene simulationScene = createSimulationScene(menuArgs);
+            Scene simulationScene = createSimulationScene(menuArgs, primaryStage);
             primaryStage.setScene(simulationScene);
             engineSnakeThread.start();
             engineWallThread.start();
@@ -80,6 +87,7 @@ public class App extends Application implements IAppObserver {
 
         exitButton.setOnAction(click -> {
             Platform.exit();
+            System.exit(0);
         });
 
         HBox buttonBox = new HBox(40, createSimulationButton, exitButton);
@@ -94,7 +102,7 @@ public class App extends Application implements IAppObserver {
                 buttonBox);
     }
 
-    public Scene createSimulationScene(Map<String, Number> menuArgs){
+    public Scene createSimulationScene(Map<String, Number> menuArgs, Stage primaryStage){
         prepareSimulation(menuArgs);
         prepareGrid(snakeGrid, snakeEngine.getMap());
         prepareGrid(wallGrid, wallEngine.getMap());
@@ -105,18 +113,52 @@ public class App extends Application implements IAppObserver {
         HBox startStopSnakeBox = prepareStartStopBox(snakeEngine);
         HBox startStopWallBox = prepareStartStopBox(wallEngine);
 
-        VBox snakeVBox = new VBox(40, snakeGrid, startStopSnakeBox,
+        VBox snakeStatsVBox = new VBox(40, snakeGrid, startStopSnakeBox,
                 prepareGenotypeDominantAndMagicBornInfo(snakeGenotype, snakeMagicBorn, snakeEngine.getMap()),
                 this.prepareAllPlotsVBox(snakeDoublePlot, snakePlots));
-        VBox wallVBox = new VBox(40, wallGrid, startStopWallBox,
+        VBox wallStatsVBox = new VBox(40, wallGrid, startStopWallBox,
                 prepareGenotypeDominantAndMagicBornInfo(wallGenotype, wallMagicBorn, wallEngine.getMap()),
                 this.prepareAllPlotsVBox(wallDoublePlot, wallPlots));
 
-        HBox hBox = new HBox(40, snakeVBox, wallVBox);
-        hBox.setAlignment(Pos.CENTER);
+        HBox simulationsBox = new HBox(40, snakeStatsVBox, wallStatsVBox);
+        VBox sceneBox = new VBox(40, createMapLegendHBox(), simulationsBox, createExitButtonHBox(primaryStage));
+        simulationsBox.setAlignment(Pos.CENTER);
+        sceneBox.setAlignment(Pos.CENTER);
         snakeGrid.setAlignment(Pos.CENTER);
         wallGrid.setAlignment(Pos.CENTER);
-        return new Scene(hBox);
+        return new Scene(sceneBox);
+    }
+
+    public HBox createExitButtonHBox(Stage primaryStage){
+        Button exitButton = new Button("Exit to menu");
+
+        exitButton.setOnAction(click -> {
+            engineSnakeThread.stop();
+            engineWallThread.stop();
+            primaryStage.setScene(menuScene);
+        });
+
+        HBox hbox = new HBox(exitButton);
+        hbox.setAlignment(Pos.CENTER);
+        return hbox;
+    }
+
+    public HBox createMapLegendHBox(){
+        Color[] colors = {Color.LIGHTGREEN, Color.LIME, Color.GREEN};
+        String[] descriptions = {"Step Field", "Grass Field", "Jungle Field"};
+        HBox hBox = new HBox(40);
+
+        for (int i=0; i < colors.length; i++){
+            HBox oneLegendField = new HBox(20, new Rectangle(10,10, colors[i]), new Label(descriptions[i]));
+            oneLegendField.setAlignment(Pos.CENTER);
+            hBox.getChildren().add(oneLegendField);
+        }
+
+        HBox animalLegend = new HBox(20, new Circle(5, Color.SADDLEBROWN), new Label("Animal (the darker the stronger)"));
+        animalLegend.setAlignment(Pos.CENTER);
+        hBox.getChildren().add(animalLegend);
+        hBox.setAlignment(Pos.CENTER);
+        return hBox;
     }
 
     public void prepareSimulation(Map<String, Number> menuArgs){
@@ -173,8 +215,8 @@ public class App extends Application implements IAppObserver {
         Map<String,String> defaultMenuValues = new HashMap();
         defaultMenuValues.put("Map height", "10");
         defaultMenuValues.put("Map width", "10");
-        defaultMenuValues.put("Jungle ratio", "0.4");
-        defaultMenuValues.put("Grass energy", "15");
+        defaultMenuValues.put("Jungle ratio", "0.5");
+        defaultMenuValues.put("Grass energy", "30");
         defaultMenuValues.put("Animal start energy", "200");
         defaultMenuValues.put("Animal move energy", "5");
         defaultMenuValues.put("Use magic born [yes/no]", "no");
