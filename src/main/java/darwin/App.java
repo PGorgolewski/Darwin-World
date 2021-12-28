@@ -43,7 +43,9 @@ public class App extends Application implements IAppObserver {
     private final Map<String, Plot> snakePlots = new HashMap<>();
     private final CSVHandler snakeCSVHandler = new CSVHandler("snake_map_stats");
     private final CSVHandler wallCSVHandler = new CSVHandler("wall_map_stats");
-    private final int circleR = 5;
+    private double circleR = 5;
+    private double gridCellHeight = 10;
+    private double gridCellWidth = 10;
 
     public void start(Stage primaryStage) {
         Scene menuScene = new Scene(createVBoxMenu(primaryStage),400,600);
@@ -54,9 +56,35 @@ public class App extends Application implements IAppObserver {
             System.exit(0);
         });
 
+        addListenersToHeightAndWidth(primaryStage);
+
         primaryStage.setScene(menuScene);
         primaryStage.setTitle("Darwin World Simulation");
         primaryStage.show();
+    }
+
+    private void addListenersToHeightAndWidth(Stage primaryStage) {
+        primaryStage.widthProperty().addListener((obs, oldVal, newVal) -> {
+            if (snakeEngine != null && !snakeEngine.ifRunning){
+                int width = snakeEngine.getMap().getWidth();
+                gridCellWidth = ((double) newVal / 3) / width;
+                updateCircleRAndGrids();
+            }
+        });
+
+        primaryStage.heightProperty().addListener((obs, oldVal, newVal) -> {
+            if (snakeEngine != null){
+                int height = snakeEngine.getMap().getHeight();
+                gridCellHeight = ((double) newVal / 3) / height;
+                updateCircleRAndGrids();
+            }
+        });
+    }
+
+    private void updateCircleRAndGrids() {
+        circleR = Math.min(gridCellHeight/2, gridCellWidth/2);
+        updateGuiForObserving(snakeGrid, snakeEngine, false);
+        updateGuiForObserving(wallGrid, wallEngine, false);
     }
 
     public void addPlots(Map<String, Plot> givenMap){
@@ -131,7 +159,7 @@ public class App extends Application implements IAppObserver {
         sceneBox.setAlignment(Pos.CENTER);
         snakeGrid.setAlignment(Pos.CENTER);
         wallGrid.setAlignment(Pos.CENTER);
-        return new Scene(sceneBox);
+        return new Scene(sceneBox, 1300, 900);
     }
 
     private VBox getWallStatsVBox() {
@@ -193,7 +221,7 @@ public class App extends Application implements IAppObserver {
         }
 
         for (int i=0; i < circleColors.length; i++){
-            HBox oneLegendField = new HBox(20, new Circle(circleR, circleColors[i]), new Label(circleDescription[i]));
+            HBox oneLegendField = new HBox(20, new Circle(5, circleColors[i]), new Label(circleDescription[i]));
             oneLegendField.setAlignment(Pos.CENTER);
             hBox.getChildren().add(oneLegendField);
         }
@@ -447,10 +475,10 @@ public class App extends Application implements IAppObserver {
 
     private void updateGridConstraints(GridPane grid, int height, int width) {
         for (int y = 0; y < height; y++) {
-            grid.getRowConstraints().add(new RowConstraints(10, 30, Double.MAX_VALUE));
+            grid.getRowConstraints().add(new RowConstraints(gridCellHeight));
         }
         for (int x = 0; x < width; x++) {
-            grid.getColumnConstraints().add(new ColumnConstraints(10, 30, Double.MAX_VALUE));
+            grid.getColumnConstraints().add(new ColumnConstraints(gridCellWidth));
         }
     }
 
@@ -470,7 +498,6 @@ public class App extends Application implements IAppObserver {
         hbox.setAlignment(Pos.CENTER);
 
         hbox.setBackground(new Background(new BackgroundFill(backgroundColor, CornerRadii.EMPTY, Insets.EMPTY)));
-        hbox.setBorder(new Border(new BorderStroke(Color.BLACK, BorderStrokeStyle.SOLID, null, new BorderWidths(1))));
         grid.add(hbox, x, y, 1, 1);
         GridPane.setHalignment(hbox, HPos.CENTER);
     }
