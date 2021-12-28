@@ -5,6 +5,7 @@ import javafx.application.Platform;
 import javafx.geometry.HPos;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 
 import javafx.scene.control.Button;
@@ -21,7 +22,6 @@ import java.util.*;
 
 //TODO autoresizing
 //TODO wskazywanie pojedynczego zwierza po zatrzymaniu
-//TODO zapisywanie statystyk do pliku w csv formacie
 //TODO ma byc uruchamiane za pomoca komendy gradla
 public class App extends Application implements IAppObserver {
     GridPane snakeGrid = new GridPane();
@@ -45,6 +45,7 @@ public class App extends Application implements IAppObserver {
     private final CSVHandler wallCSVHandler = new CSVHandler("wall_map_stats");
     private Thread engineSnakeThread;
     private Thread engineWallThread;
+    private boolean ifAnimalsWithDominant = false;
 
 
     public void addPlots(Map<String, Plot> givenMap){
@@ -117,11 +118,11 @@ public class App extends Application implements IAppObserver {
         engineWallThread = new Thread(wallEngine);
 
         VBox snakeStatsVBox = new VBox(40, prepareMapWithButtonsBox(snakeGrid,
-                prepareStartStopBox(snakeEngine, snakeCSVHandler, snakeDoublePlot, snakePlots )),
+                prepareStartStopBox(snakeEngine, snakeCSVHandler, snakeDoublePlot, snakePlots, snakeGrid)),
                 prepareGenotypeDominantAndMagicBornInfo(snakeGenotype, snakeMagicBorn, snakeEngine.getMap()),
                 this.prepareAllPlotsVBox(snakeDoublePlot, snakePlots));
         VBox wallStatsVBox = new VBox(40, prepareMapWithButtonsBox(wallGrid,
-                prepareStartStopBox(wallEngine, wallCSVHandler, wallDoublePlot, wallPlots)),
+                prepareStartStopBox(wallEngine, wallCSVHandler, wallDoublePlot, wallPlots, wallGrid)),
                 prepareGenotypeDominantAndMagicBornInfo(wallGenotype, wallMagicBorn, wallEngine.getMap()),
                 this.prepareAllPlotsVBox(wallDoublePlot, wallPlots));
 
@@ -220,12 +221,12 @@ public class App extends Application implements IAppObserver {
         Map<String,String> defaultMenuValues = new HashMap();
         defaultMenuValues.put("Map height", "10");
         defaultMenuValues.put("Map width", "10");
-        defaultMenuValues.put("Jungle ratio", "0.5");
+        defaultMenuValues.put("Jungle ratio", "0.4");
         defaultMenuValues.put("Grass energy", "30");
         defaultMenuValues.put("Animal start energy", "200");
         defaultMenuValues.put("Animal move energy", "5");
         defaultMenuValues.put("Use magic born [yes/no]", "no");
-        defaultMenuValues.put("Start animals number", "20");
+        defaultMenuValues.put("Start animals number", "15");
         defaultMenuValues.put("Refresh time (in ms)", "300");
 
         return defaultMenuValues;
@@ -262,11 +263,27 @@ public class App extends Application implements IAppObserver {
     }
 
     public VBox prepareStartStopBox(SimulationEngine givenSimulation, CSVHandler handler, DoublePlot doublePlot,
-                                    Map<String, Plot> plots){
+                                    Map<String, Plot> plots, GridPane grid){
         VBox box = new VBox(20, prepareStartButton(givenSimulation),
-                prepareStopButton(givenSimulation), prepareToCSVButton(givenSimulation, handler, doublePlot, plots));
+                prepareStopButton(givenSimulation), prepareToCSVButton(givenSimulation, handler, doublePlot, plots),
+                prepareShowAnimalsWithGenotype(givenSimulation, grid));
         box.setAlignment(Pos.CENTER);
         return box;
+    }
+
+    public Button prepareShowAnimalsWithGenotype(SimulationEngine givenSimulation, GridPane grid){
+        Button button = new Button("Show animals with dominant genotype");
+
+        button.setOnAction(click -> {
+            if (!givenSimulation.ifRunning){
+                ifAnimalsWithDominant = true;
+                clearGrid(grid);
+                prepareGrid(grid, givenSimulation.getMap());
+                ifAnimalsWithDominant = false;
+            }
+        });
+
+        return button;
     }
 
     public Button prepareToCSVButton(SimulationEngine givenSimulation, CSVHandler handler, DoublePlot doublePlot,
@@ -371,7 +388,6 @@ public class App extends Application implements IAppObserver {
                 hbox.setBorder(new Border(new BorderStroke(Color.BLACK, BorderStrokeStyle.SOLID, null, new BorderWidths(1))));
                 grid.add(hbox, x, y, 1, 1);
                 GridPane.setHalignment(hbox, HPos.CENTER);
-
             }
         }
         for (int y = 0; y < height; y++) {
@@ -383,6 +399,13 @@ public class App extends Application implements IAppObserver {
     }
 
     public Circle getCircleForTheStrongestAnimal(Vector2d position, AbstractMap map) {
+        if (ifAnimalsWithDominant && map.getAnimalsFromGivenPosition(position).stream()
+                .anyMatch(animal -> animal.getGenes().equals(map.getTheMostFrequentGenotype()))){
+            Circle circle = new Circle(6);
+            circle.setFill(Color.ORANGERED);
+            return circle;
+        }
+
         List<Animal> positionAnimals = map.getSortedListOfAnimalsOnPosition(position);
         return (positionAnimals.size() != 0) ? getCircleForGivenAnimal(positionAnimals.get(0)) : null;
     }
