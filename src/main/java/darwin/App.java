@@ -5,10 +5,9 @@ import javafx.application.Platform;
 import javafx.geometry.HPos;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.Node;
 import javafx.scene.Scene;
-
 import javafx.scene.control.Button;
+import javafx.scene.control.Cell;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.*;
@@ -16,16 +15,18 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
-
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
+
+import static java.lang.String.valueOf;
 
 //TODO autoresizing
-//TODO wskazywanie pojedynczego zwierza po zatrzymaniu
-//TODO ma byc uruchamiane za pomoca komendy gradla
 public class App extends Application implements IAppObserver {
     GridPane snakeGrid = new GridPane();
     GridPane wallGrid = new GridPane();
+    VBox wallAnimalObservedStats = new VBox(20);
+    VBox snakeAnimalObservedStats = new VBox(20);
     SimulationEngine snakeEngine;
     SimulationEngine wallEngine;
     private boolean ifMagicBorn;
@@ -45,7 +46,6 @@ public class App extends Application implements IAppObserver {
     private final CSVHandler wallCSVHandler = new CSVHandler("wall_map_stats");
     private Thread engineSnakeThread;
     private Thread engineWallThread;
-    private boolean ifAnimalsWithDominant = false;
 
 
     public void addPlots(Map<String, Plot> givenMap){
@@ -111,20 +111,20 @@ public class App extends Application implements IAppObserver {
 
     public Scene createSimulationScene(Map<String, Number> menuArgs, Stage primaryStage){
         prepareSimulation(menuArgs);
-        prepareGrid(snakeGrid, snakeEngine.getMap());
-        prepareGrid(wallGrid, wallEngine.getMap());
+        prepareGrid(snakeGrid, snakeEngine);
+        prepareGrid(wallGrid, wallEngine);
 
         engineSnakeThread = new Thread(snakeEngine);
         engineWallThread = new Thread(wallEngine);
 
         VBox snakeStatsVBox = new VBox(40, prepareMapWithButtonsBox(snakeGrid,
-                prepareStartStopBox(snakeEngine, snakeCSVHandler, snakeDoublePlot, snakePlots, snakeGrid)),
-                prepareGenotypeDominantAndMagicBornInfo(snakeGenotype, snakeMagicBorn, snakeEngine.getMap()),
-                this.prepareAllPlotsVBox(snakeDoublePlot, snakePlots));
+                prepareButtonsBox(snakeEngine, snakeCSVHandler, snakeDoublePlot, snakePlots, snakeGrid)),
+                snakeAnimalObservedStats,
+                prepareStatsVBox(snakeGenotype, snakeMagicBorn, snakeEngine.getMap(),snakeDoublePlot, snakePlots));
         VBox wallStatsVBox = new VBox(40, prepareMapWithButtonsBox(wallGrid,
-                prepareStartStopBox(wallEngine, wallCSVHandler, wallDoublePlot, wallPlots, wallGrid)),
-                prepareGenotypeDominantAndMagicBornInfo(wallGenotype, wallMagicBorn, wallEngine.getMap()),
-                this.prepareAllPlotsVBox(wallDoublePlot, wallPlots));
+                prepareButtonsBox(wallEngine, wallCSVHandler, wallDoublePlot, wallPlots, wallGrid)),
+                wallAnimalObservedStats,
+                prepareStatsVBox(wallGenotype, wallMagicBorn, wallEngine.getMap(), wallDoublePlot, wallPlots));
 
         HBox simulationsBox = new HBox(40, snakeStatsVBox, wallStatsVBox);
         VBox sceneBox = new VBox(40, createMapLegendHBox(), simulationsBox, createExitButtonHBox(primaryStage));
@@ -150,19 +150,24 @@ public class App extends Application implements IAppObserver {
     }
 
     public HBox createMapLegendHBox(){
-        Color[] colors = {Color.LIGHTGREEN, Color.LIME, Color.GREEN};
-        String[] descriptions = {"Step Field", "Grass Field", "Jungle Field"};
+        Color[] rectanglesColors = {Color.LIGHTGREEN, Color.LIME, Color.GREEN};
+        String[] rectanglesDescriptions = {"Step Field", "Grass Field", "Jungle Field"};
+        Color[] circleColors = {Color.SADDLEBROWN, Color.RED, Color.BLUEVIOLET};
+        String[] circleDescription = {"Animal (the darker the stronger)", "Animal with dominant genotype", "Observed animal"};
         HBox hBox = new HBox(40);
 
-        for (int i=0; i < colors.length; i++){
-            HBox oneLegendField = new HBox(20, new Rectangle(10,10, colors[i]), new Label(descriptions[i]));
+        for (int i=0; i < rectanglesColors.length; i++){
+            HBox oneLegendField = new HBox(20, new Rectangle(10,10, rectanglesColors[i]), new Label(rectanglesDescriptions[i]));
             oneLegendField.setAlignment(Pos.CENTER);
             hBox.getChildren().add(oneLegendField);
         }
 
-        HBox animalLegend = new HBox(20, new Circle(5, Color.SADDLEBROWN), new Label("Animal (the darker the stronger)"));
-        animalLegend.setAlignment(Pos.CENTER);
-        hBox.getChildren().add(animalLegend);
+        for (int i=0; i < circleColors.length; i++){
+            HBox oneLegendField = new HBox(20, new Circle(5, circleColors[i]), new Label(circleDescription[i]));
+            oneLegendField.setAlignment(Pos.CENTER);
+            hBox.getChildren().add(oneLegendField);
+        }
+
         hBox.setAlignment(Pos.CENTER);
         return hBox;
     }
@@ -232,28 +237,37 @@ public class App extends Application implements IAppObserver {
         return defaultMenuValues;
     }
 
-    public HBox prepareGenotypeDominantAndMagicBornInfo(Label givenGenotypeLabel, Label givenMagicBornLabel, AbstractMap map){
-        givenGenotypeLabel.setText("Dominant genotype: " + map.getTheMostFrequentGenotype().toString());
-        HBox hBox;
-        if (ifMagicBorn)
-            hBox = new HBox(20, givenGenotypeLabel, givenMagicBornLabel);
-        else
-            hBox = new HBox(20, givenGenotypeLabel);
-        hBox.setAlignment(Pos.CENTER);
-        return hBox;
-    }
+    public VBox prepareStatsVBox(Label givenGenotypeLabel, Label givenMagicBornLabel, AbstractMap map,
+                                 DoublePlot doublePlot, Map<String, Plot> plots){
+        HBox title = new HBox(20, getLabelWithBoldText("GENERAL STATS"));
+        title.setAlignment(Pos.CENTER);
 
-    public VBox prepareAllPlotsVBox(DoublePlot givenDoublePlot, Map<String, Plot> givenPlots){
-        return new VBox(40, preparePlotHBox(givenDoublePlot, givenPlots.get("Average energy")),
-                preparePlotHBox(givenPlots.get("Average lifetime"), givenPlots.get("Average children number")));
+        givenGenotypeLabel.setText("Dominant genotype: " + map.getTheMostFrequentGenotype().toString());
+        HBox magicBornAndGenotypeBox;
+        if (ifMagicBorn)
+            magicBornAndGenotypeBox = new HBox(20, givenGenotypeLabel, givenMagicBornLabel);
+        else
+            magicBornAndGenotypeBox = new HBox(20, givenGenotypeLabel);
+        magicBornAndGenotypeBox.setAlignment(Pos.CENTER);
+
+        HBox firstPlotsBox = preparePlotHBox(doublePlot, plots.get("Average energy"));
+        HBox secondsPlotsBox = preparePlotHBox(plots.get("Average lifetime"), plots.get("Average children number"));
+
+        VBox boxWithStatsTitle = new VBox(20, title, magicBornAndGenotypeBox, firstPlotsBox, secondsPlotsBox);
+
+        return boxWithStatsTitle;
     }
 
     public HBox preparePlotHBox(DoublePlot doublePlot, Plot plot){
-       return new HBox(20, doublePlot.getLineChart(), plot.getLineChart());
+        HBox hbox = new HBox(20, doublePlot.getLineChart(), plot.getLineChart());
+        hbox.setAlignment(Pos.CENTER);
+        return hbox;
     }
 
     public HBox preparePlotHBox(Plot firstPlot, Plot secondPlot){
-        return new HBox(20, firstPlot.getLineChart(), secondPlot.getLineChart());
+        HBox hbox = new HBox(20, firstPlot.getLineChart(), secondPlot.getLineChart());
+        hbox.setAlignment(Pos.CENTER);
+        return hbox;
     }
 
     public HBox prepareMapWithButtonsBox(GridPane mapGrid, VBox buttonsBox){
@@ -262,7 +276,7 @@ public class App extends Application implements IAppObserver {
         return box;
     }
 
-    public VBox prepareStartStopBox(SimulationEngine givenSimulation, CSVHandler handler, DoublePlot doublePlot,
+    public VBox prepareButtonsBox(SimulationEngine givenSimulation, CSVHandler handler, DoublePlot doublePlot,
                                     Map<String, Plot> plots, GridPane grid){
         VBox box = new VBox(20, prepareStartButton(givenSimulation),
                 prepareStopButton(givenSimulation), prepareToCSVButton(givenSimulation, handler, doublePlot, plots),
@@ -276,10 +290,8 @@ public class App extends Application implements IAppObserver {
 
         button.setOnAction(click -> {
             if (!givenSimulation.ifRunning){
-                ifAnimalsWithDominant = true;
                 clearGrid(grid);
-                prepareGrid(grid, givenSimulation.getMap());
-                ifAnimalsWithDominant = false;
+                prepareGrid(grid, givenSimulation, true);
             }
         });
 
@@ -295,9 +307,7 @@ public class App extends Application implements IAppObserver {
                 handler.updateData("Animals", doublePlot.getSeries1AllValues(), doublePlot.getSeries1Average());
                 handler.updateData("Grass", doublePlot.getSeries2AllValues(), doublePlot.getSeries2Average());
 
-                plots.forEach((plotName,plot) -> {
-                    handler.updateData(plotName, plot.getAllValues(), plot.getSeriesAverage());
-                });
+                plots.forEach((plotName,plot) -> handler.updateData(plotName, plot.getAllValues(), plot.getSeriesAverage()));
                 try {
                     handler.createCSV();
                 } catch (IOException e) {
@@ -332,12 +342,14 @@ public class App extends Application implements IAppObserver {
         Map<String, Plot> plots;
         Label magicBorn;
         Label genotype;
+        SimulationEngine engine;
         if (map instanceof WallMap) {
             grid = wallGrid;
             doublePlot = wallDoublePlot;
             plots = wallPlots;
             magicBorn = wallMagicBorn;
             genotype = wallGenotype;
+            engine = wallEngine;
         }
         else {
             grid = snakeGrid;
@@ -345,17 +357,19 @@ public class App extends Application implements IAppObserver {
             plots = snakePlots;
             magicBorn = snakeMagicBorn;
             genotype = snakeGenotype;
+            engine = snakeEngine;
         }
 
         Platform.runLater(() -> {
             clearGrid(grid);
-            prepareGrid(grid, map);
+            prepareGrid(grid, engine);
             doublePlot.updatePlot(day,animalsNumber,grassNumber);
             plots.get("Average energy").updatePlot(day, averageEnergy);
             plots.get("Average lifetime").updatePlot(day, averageLifetime);
             plots.get("Average children number").updatePlot(day, averageChildrenNumber);
             genotype.setText("Dominant genotype: " + map.getTheMostFrequentGenotype().toString());
             if (ifMagicBorn) magicBorn.setText("Magic born " + magicBornCounter + "/3");
+            prepareAnimalObservedStats(engine);
         });
     }
 
@@ -365,13 +379,14 @@ public class App extends Application implements IAppObserver {
         grid.getColumnConstraints().clear();
     }
 
-    public void prepareGrid(GridPane grid, AbstractMap map) {
+    public void prepareGrid(GridPane grid, SimulationEngine engine, boolean ifDominant) {
+        AbstractMap map = engine.getMap();
         int height = map.getHeight();
         int width = map.getWidth();
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 Vector2d currPos = new Vector2d(x,y);
-                Circle circle = getCircleForTheStrongestAnimal(currPos, map);
+                Circle circle = getAnimalCircle(currPos, engine, ifDominant, grid);
                 Color backgroundColor = Color.LIGHTGREEN;
 
                 if (map.isGrassOnPosition(new Vector2d(x,y))){
@@ -398,21 +413,92 @@ public class App extends Application implements IAppObserver {
         }
     }
 
-    public Circle getCircleForTheStrongestAnimal(Vector2d position, AbstractMap map) {
-        if (ifAnimalsWithDominant && map.getAnimalsFromGivenPosition(position).stream()
-                .anyMatch(animal -> animal.getGenes().equals(map.getTheMostFrequentGenotype()))){
-            Circle circle = new Circle(6);
-            circle.setFill(Color.ORANGERED);
-            return circle;
-        }
-
-        List<Animal> positionAnimals = map.getSortedListOfAnimalsOnPosition(position);
-        return (positionAnimals.size() != 0) ? getCircleForGivenAnimal(positionAnimals.get(0)) : null;
+    public void prepareGrid(GridPane grid, SimulationEngine engine){
+        prepareGrid(grid, engine,false);
     }
 
-    public Circle getCircleForGivenAnimal(Animal animal){
-        Circle animalCircle = new Circle(6);
-        animalCircle.setFill(animal.toColor(startEnergy));
-        return animalCircle;
+    public void prepareAnimalObservedStats(SimulationEngine engine){
+        AbstractMap map = engine.getMap();
+        VBox statsBox;
+        if (map instanceof WallMap) statsBox = wallAnimalObservedStats;
+        else statsBox = snakeAnimalObservedStats;
+        statsBox.getChildren().clear();
+
+        if (map.observedAnimal == null) return;
+        HBox statsLabelTitle = new HBox(20, getLabelWithBoldText("Observing Stats"));
+        statsLabelTitle.setAlignment(Pos.CENTER);
+        HBox genotype = new HBox(10, getLabelWithBoldText("Genotype"), new Label(map.observedAnimal.getGenes().toString()));
+        HBox children = new HBox(10, getLabelWithBoldText("Children"), new Label(valueOf(map.observedAnimal.getChildrenAfterObservingStarts())));
+        HBox descendants = new HBox(10, getLabelWithBoldText("Descendants"), new Label(valueOf(map.observedAnimal.getAllDescendantsNumber())));
+        HBox deadDate = new HBox(10, getLabelWithBoldText("Dead date"), new Label(map.observedAnimal.getDeadDateString()));
+        HBox numberStatsBox = new HBox(20, children, descendants, deadDate);
+
+        statsBox.getChildren().addAll(statsLabelTitle, genotype, numberStatsBox);
+        statsLabelTitle.setAlignment(Pos.CENTER);
+        genotype.setAlignment(Pos.CENTER);
+        numberStatsBox.setAlignment(Pos.CENTER);
+        statsBox.setAlignment(Pos.CENTER);
+    }
+
+    public Label getLabelWithBoldText(String text){
+        Label label = new Label(text);
+        label.setStyle("-fx-font-weight: bold");
+        label.setAlignment(Pos.CENTER);
+        return label;
+    }
+    public Circle getAnimalCircle(Vector2d position, SimulationEngine engine, boolean ifDominant, GridPane grid) {
+        Circle circle = null;
+        Animal animal = null;
+        AbstractMap map = engine.getMap();
+
+        if (map.observedAnimal != null && map.observedAnimal.isAlive() && map.observedAnimal.getPosition().equals(position)){
+            circle = new Circle(6);
+            circle.setFill(Color.BLUEVIOLET);
+            animal = map.observedAnimal;
+        }
+
+        else if (ifDominant){
+            ArrayList<Animal> animalsWithDominant = map.getAnimalsFromGivenPosition(position).stream()
+                    .filter(a -> a.getGenes().equals(map.getTheMostFrequentGenotype()))
+                    .sorted((a1, a2) -> Float.compare(a1.getEnergy(), a2.getEnergy()))
+                    .collect(Collectors.toCollection(ArrayList::new));
+            if (!animalsWithDominant.isEmpty()){
+                circle = new Circle(6);
+                animal = animalsWithDominant.get(animalsWithDominant.size()-1);
+                circle.setFill(Color.RED);
+            }
+        }
+
+        if (circle == null){
+            List<Animal> positionAnimals = map.getSortedListOfAnimalsOnPosition(position);
+            circle = (positionAnimals.size() != 0) ? new Circle(6) : null;
+            if (circle != null) {
+                animal = positionAnimals.get(positionAnimals.size() - 1);
+                circle.setFill(animal.toColor(startEnergy));
+            }
+        }
+
+        if (circle != null){
+            Animal finalAnimal = animal;
+            circle.setOnMouseClicked(e -> {
+                if (!engine.ifRunning){
+                    if (engine.getMap().observedAnimal != null){
+                        engine.getMap().observedAnimal.stopObserving();
+                    }
+
+                    if (engine.getMap().observedAnimal == finalAnimal){
+                        engine.getMap().observedAnimal = null;
+                    } else{
+                        engine.getMap().observedAnimal = finalAnimal;
+                        engine.getMap().observedAnimal.setObserved(true);
+                    }
+                    clearGrid(grid);
+                    prepareGrid(grid, engine, ifDominant);
+                    prepareAnimalObservedStats(engine);
+                }
+            });
+        }
+
+        return circle;
     }
 }

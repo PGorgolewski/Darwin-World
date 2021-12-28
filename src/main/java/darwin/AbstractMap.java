@@ -13,7 +13,8 @@ abstract class AbstractMap implements IObserver{
     protected final Set<Vector2d> stepFreePositions = new HashSet<>();
     protected final Map<Vector2d, Grass> grassMap = new HashMap<>();
     protected final Map<Vector2d, Set<Animal>> animalMap = new HashMap<>();
-    protected final Map<List<Integer>, Integer> genotypeOccurences = new HashMap<>();
+    protected final Map<List<Integer>, Integer> genotypeOccurrences = new HashMap<>();
+    protected Animal observedAnimal = null;
 
     protected AbstractMap(int width, int height, float jungleRatio) {
         this.width = width;
@@ -65,16 +66,16 @@ abstract class AbstractMap implements IObserver{
     }
 
     protected void addToGenotypeMap(List<Integer> genes){
-        if (this.genotypeOccurences.containsKey(genes))
-            this.genotypeOccurences.replace(genes, this.genotypeOccurences.get(genes) + 1);
+        if (this.genotypeOccurrences.containsKey(genes))
+            this.genotypeOccurrences.replace(genes, this.genotypeOccurrences.get(genes) + 1);
         else
-            this.genotypeOccurences.put(genes, 1);
+            this.genotypeOccurrences.put(genes, 1);
     }
 
     protected void removeFromGenotypeMap(List<Integer> genes){
-        this.genotypeOccurences.replace(genes, this.genotypeOccurences.get(genes) - 1);
-        if (this.genotypeOccurences.get(genes) == 0)
-            this.genotypeOccurences.remove(genes);
+        this.genotypeOccurrences.replace(genes, this.genotypeOccurrences.get(genes) - 1);
+        if (this.genotypeOccurrences.get(genes) == 0)
+            this.genotypeOccurrences.remove(genes);
     }
 
     protected void placeElement(AbstractMapElement mapElement){
@@ -168,22 +169,14 @@ abstract class AbstractMap implements IObserver{
         List<Integer> theMostFrequent = new ArrayList<>();
         int maxOccurrences = 0;
 
-        for (List<Integer> genotype: this.genotypeOccurences.keySet()){
-            if (genotypeOccurences.get(genotype) > maxOccurrences){
-                maxOccurrences = genotypeOccurences.get(genotype);
+        for (List<Integer> genotype: this.genotypeOccurrences.keySet()){
+            if (genotypeOccurrences.get(genotype) > maxOccurrences){
+                maxOccurrences = genotypeOccurrences.get(genotype);
                 theMostFrequent = genotype;
             }
         }
 
         return theMostFrequent;
-    }
-
-    public Vector2d getJungleLowerLeft() {
-        return jungleLowerLeft;
-    }
-
-    public Vector2d getJungleUpperRight() {
-        return jungleUpperRight;
     }
 
     public void positionChanged(AbstractMapElement element, Vector2d oldPosition){

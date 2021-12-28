@@ -26,5 +26,5 @@ test {
 }
 
 application {
-    mainClassName = 'agh.ics.oop.World'
+    mainClassName = 'darwin.World'
 }

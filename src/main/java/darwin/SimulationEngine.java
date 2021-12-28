@@ -103,14 +103,24 @@ public class SimulationEngine implements Runnable{
                     .collect(Collectors.toCollection(ArrayList::new));
 
             if (aliveAnimals.size() >= 2){
+                Collections.reverse(aliveAnimals);
                 Animal babyAnimal = new Animal(aliveAnimals.get(0), aliveAnimals.get(1), this.map, this.map, this.currDay);
                 aliveAnimals.get(0).setChildrenNumber(aliveAnimals.get(0).getChildrenNumber()+1);
                 aliveAnimals.get(1).setChildrenNumber(aliveAnimals.get(1).getChildrenNumber()+1);
                 allAnimals.add(babyAnimal);
                 this.map.placeElement(babyAnimal);
                 this.currAnimalsNumber++;
+                addToChildrenListIfParentObserved(aliveAnimals.get(0), babyAnimal);
+                addToChildrenListIfParentObserved(aliveAnimals.get(1), babyAnimal);
             }
         });
+    }
+
+    public void addToChildrenListIfParentObserved(Animal parent, Animal child){
+        if (parent.isObserved){
+            parent.addChildWhenObserved(child);
+            child.setObserved(true);
+        }
     }
 
     public void eatGrasses(){
@@ -151,6 +161,7 @@ public class SimulationEngine implements Runnable{
                     this.positionsWithAnimalAndGrass.add(afterMovePosition);
                 }
             }else{
+                currentAnimal.setAsDead();
                 this.deadAnimals.add(currentAnimal);
             }
         }

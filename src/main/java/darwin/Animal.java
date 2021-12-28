@@ -1,20 +1,22 @@
 package darwin;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+
+import static java.lang.String.valueOf;
 
 public class Animal extends AbstractMapElement {
     private MapDirections orient;
     private final List<Integer> genes = new ArrayList<>();
     private final int birthDay;
     private int lifetime = 0;
+    private boolean isAlive = true;
     private int childrenNumber = 0;
-    private final List<Animal> children = new ArrayList<>();
+    public boolean isObserved = false;
+    private final List<Animal> childrenAfterObservingStarts = new ArrayList<>();
 
     //INITIAL BORN
     public Animal(Vector2d startPosition, AbstractMap map, int startEnergy, IObserver observer, int birthDay) {
@@ -171,5 +173,52 @@ public class Animal extends AbstractMapElement {
 
     public void setChildrenNumber(int childrenNumber) {
         this.childrenNumber = childrenNumber;
+    }
+
+    public void setObserved(boolean observed) {
+        isObserved = observed;
+    }
+
+    public void stopObserving(){
+        for (Animal child: childrenAfterObservingStarts){
+            child.stopObserving();
+        }
+        childrenAfterObservingStarts.clear();
+        setObserved(false);
+    }
+
+    public void addChildWhenObserved(Animal child){
+        childrenAfterObservingStarts.add(child);
+    }
+
+    public Set<Animal> createSetOfAllDescendants(){
+        Set<Animal> descendants = new HashSet<>(childrenAfterObservingStarts);
+        for (Animal child: childrenAfterObservingStarts){
+            descendants.addAll(child.createSetOfAllDescendants());
+        }
+        return descendants;
+    }
+
+    public int getAllDescendantsNumber(){
+        return createSetOfAllDescendants().size();
+    }
+
+    public int getChildrenAfterObservingStarts(){
+        return childrenAfterObservingStarts.size();
+    }
+
+    public String getDeadDateString(){
+        if (isAlive)
+            return "is alived";
+
+        return valueOf(birthDay+lifetime);
+    }
+
+    public void setAsDead(){
+        isAlive = false;
+    }
+
+    public boolean isAlive() {
+        return isAlive;
     }
 }
