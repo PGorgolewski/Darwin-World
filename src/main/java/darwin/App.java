@@ -7,7 +7,6 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
-import javafx.scene.control.Cell;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.*;
@@ -22,11 +21,12 @@ import java.util.stream.Collectors;
 import static java.lang.String.valueOf;
 
 //TODO autoresizing
+//TODO Code reflactoring
 public class App extends Application implements IAppObserver {
     GridPane snakeGrid = new GridPane();
     GridPane wallGrid = new GridPane();
-    VBox wallAnimalObservedStats = new VBox(20);
-    VBox snakeAnimalObservedStats = new VBox(20);
+    VBox wallAnimalObservedStats = new VBox(10);
+    VBox snakeAnimalObservedStats = new VBox(10);
     SimulationEngine snakeEngine;
     SimulationEngine wallEngine;
     private boolean ifMagicBorn;
@@ -46,7 +46,7 @@ public class App extends Application implements IAppObserver {
     private final CSVHandler wallCSVHandler = new CSVHandler("wall_map_stats");
     private Thread engineSnakeThread;
     private Thread engineWallThread;
-
+    private final int circleR = 5;
 
     public void addPlots(Map<String, Plot> givenMap){
         givenMap.put("Average energy", new Plot("Average energy", startEnergy));
@@ -99,7 +99,7 @@ public class App extends Application implements IAppObserver {
 
         HBox buttonBox = new HBox(40, createSimulationButton, exitButton);
         buttonBox.setAlignment(Pos.CENTER);
-        return new VBox(40,
+        return new VBox(20,
                 createVBoxWithLabelsAndTextFields("Map Properties",
                         new String[]{"Map height", "Map width", "Jungle ratio"}),
                 createVBoxWithLabelsAndTextFields("Menu Elements Properties",
@@ -117,17 +117,17 @@ public class App extends Application implements IAppObserver {
         engineSnakeThread = new Thread(snakeEngine);
         engineWallThread = new Thread(wallEngine);
 
-        VBox snakeStatsVBox = new VBox(40, prepareMapWithButtonsBox(snakeGrid,
+        VBox snakeStatsVBox = new VBox(20, prepareMapWithButtonsBox(snakeGrid,
                 prepareButtonsBox(snakeEngine, snakeCSVHandler, snakeDoublePlot, snakePlots, snakeGrid)),
                 snakeAnimalObservedStats,
                 prepareStatsVBox(snakeGenotype, snakeMagicBorn, snakeEngine.getMap(),snakeDoublePlot, snakePlots));
-        VBox wallStatsVBox = new VBox(40, prepareMapWithButtonsBox(wallGrid,
+        VBox wallStatsVBox = new VBox(20, prepareMapWithButtonsBox(wallGrid,
                 prepareButtonsBox(wallEngine, wallCSVHandler, wallDoublePlot, wallPlots, wallGrid)),
                 wallAnimalObservedStats,
                 prepareStatsVBox(wallGenotype, wallMagicBorn, wallEngine.getMap(), wallDoublePlot, wallPlots));
 
-        HBox simulationsBox = new HBox(40, snakeStatsVBox, wallStatsVBox);
-        VBox sceneBox = new VBox(40, createMapLegendHBox(), simulationsBox, createExitButtonHBox(primaryStage));
+        HBox simulationsBox = new HBox(20, snakeStatsVBox, wallStatsVBox);
+        VBox sceneBox = new VBox(20, createMapLegendHBox(), simulationsBox, createExitButtonHBox(primaryStage));
         simulationsBox.setAlignment(Pos.CENTER);
         sceneBox.setAlignment(Pos.CENTER);
         snakeGrid.setAlignment(Pos.CENTER);
@@ -139,12 +139,12 @@ public class App extends Application implements IAppObserver {
         Button exitButton = new Button("Exit to menu");
 
         exitButton.setOnAction(click -> {
-            engineSnakeThread.stop();
-            engineWallThread.stop();
+            wallEngine.finished = true;
+            snakeEngine.finished = true;
             primaryStage.setScene(menuScene);
         });
 
-        HBox hbox = new HBox(exitButton);
+        HBox hbox = new HBox(10, exitButton);
         hbox.setAlignment(Pos.CENTER);
         return hbox;
     }
@@ -154,7 +154,7 @@ public class App extends Application implements IAppObserver {
         String[] rectanglesDescriptions = {"Step Field", "Grass Field", "Jungle Field"};
         Color[] circleColors = {Color.SADDLEBROWN, Color.RED, Color.BLUEVIOLET};
         String[] circleDescription = {"Animal (the darker the stronger)", "Animal with dominant genotype", "Observed animal"};
-        HBox hBox = new HBox(40);
+        HBox hBox = new HBox(20);
 
         for (int i=0; i < rectanglesColors.length; i++){
             HBox oneLegendField = new HBox(20, new Rectangle(10,10, rectanglesColors[i]), new Label(rectanglesDescriptions[i]));
@@ -163,7 +163,7 @@ public class App extends Application implements IAppObserver {
         }
 
         for (int i=0; i < circleColors.length; i++){
-            HBox oneLegendField = new HBox(20, new Circle(5, circleColors[i]), new Label(circleDescription[i]));
+            HBox oneLegendField = new HBox(20, new Circle(circleR, circleColors[i]), new Label(circleDescription[i]));
             oneLegendField.setAlignment(Pos.CENTER);
             hBox.getChildren().add(oneLegendField);
         }
@@ -196,9 +196,8 @@ public class App extends Application implements IAppObserver {
     }
 
     public VBox createVBoxWithLabelsAndTextFields(String primaryLabel, String[] textFieldNames){
-        Label label = new Label(primaryLabel);
-        label.setStyle("-fx-font-weight: bold");
-        VBox vbox = new VBox(20, label, createLabelsWithTextFields(textFieldNames));
+        Label label = getLabelWithBoldText(primaryLabel);
+        VBox vbox = new VBox(10, label, createLabelsWithTextFields(textFieldNames));
         vbox.setAlignment(Pos.CENTER);
         return vbox;
     }
@@ -207,15 +206,13 @@ public class App extends Application implements IAppObserver {
         VBox vBox = new VBox(30);
         vBox.setAlignment(Pos.CENTER);
         for (String oneProperty: properties){
-            Label label = new Label(oneProperty);
-            label.setStyle("-fx-font-weight: bold");
-            label.setAlignment(Pos.CENTER);
+            Label label = getLabelWithBoldText(oneProperty);
 
             TextField textField = new TextField(defaultMenuValues.get(oneProperty));
             textField.setAlignment(Pos.CENTER);
 
             menuTextFields.put(oneProperty, textField);
-            HBox hbox = new HBox(20, label, textField);
+            HBox hbox = new HBox(10, label, textField);
             hbox.setAlignment(Pos.CENTER);
             vBox.getChildren().add(hbox);
         }
@@ -223,7 +220,7 @@ public class App extends Application implements IAppObserver {
     }
 
     public Map<String,String> createDefaultMenuValues(){
-        Map<String,String> defaultMenuValues = new HashMap();
+        Map<String,String> defaultMenuValues = new HashMap<>();
         defaultMenuValues.put("Map height", "10");
         defaultMenuValues.put("Map width", "10");
         defaultMenuValues.put("Jungle ratio", "0.4");
@@ -239,39 +236,39 @@ public class App extends Application implements IAppObserver {
 
     public VBox prepareStatsVBox(Label givenGenotypeLabel, Label givenMagicBornLabel, AbstractMap map,
                                  DoublePlot doublePlot, Map<String, Plot> plots){
-        HBox title = new HBox(20, getLabelWithBoldText("GENERAL STATS"));
+        HBox title = new HBox(10, getLabelWithBoldText("GENERAL STATS"));
         title.setAlignment(Pos.CENTER);
 
         givenGenotypeLabel.setText("Dominant genotype: " + map.getTheMostFrequentGenotype().toString());
         HBox magicBornAndGenotypeBox;
         if (ifMagicBorn)
-            magicBornAndGenotypeBox = new HBox(20, givenGenotypeLabel, givenMagicBornLabel);
+            magicBornAndGenotypeBox = new HBox(10, givenGenotypeLabel, givenMagicBornLabel);
         else
-            magicBornAndGenotypeBox = new HBox(20, givenGenotypeLabel);
+            magicBornAndGenotypeBox = new HBox(10, givenGenotypeLabel);
         magicBornAndGenotypeBox.setAlignment(Pos.CENTER);
 
         HBox firstPlotsBox = preparePlotHBox(doublePlot, plots.get("Average energy"));
         HBox secondsPlotsBox = preparePlotHBox(plots.get("Average lifetime"), plots.get("Average children number"));
 
-        VBox boxWithStatsTitle = new VBox(20, title, magicBornAndGenotypeBox, firstPlotsBox, secondsPlotsBox);
-
+        VBox boxWithStatsTitle = new VBox(10, title, magicBornAndGenotypeBox, firstPlotsBox, secondsPlotsBox);
+        boxWithStatsTitle.setAlignment(Pos.CENTER);
         return boxWithStatsTitle;
     }
 
     public HBox preparePlotHBox(DoublePlot doublePlot, Plot plot){
-        HBox hbox = new HBox(20, doublePlot.getLineChart(), plot.getLineChart());
+        HBox hbox = new HBox(10, doublePlot.getLineChart(), plot.getLineChart());
         hbox.setAlignment(Pos.CENTER);
         return hbox;
     }
 
     public HBox preparePlotHBox(Plot firstPlot, Plot secondPlot){
-        HBox hbox = new HBox(20, firstPlot.getLineChart(), secondPlot.getLineChart());
+        HBox hbox = new HBox(10, firstPlot.getLineChart(), secondPlot.getLineChart());
         hbox.setAlignment(Pos.CENTER);
         return hbox;
     }
 
     public HBox prepareMapWithButtonsBox(GridPane mapGrid, VBox buttonsBox){
-        HBox box = new HBox(20, mapGrid, buttonsBox);
+        HBox box = new HBox(10, mapGrid, buttonsBox);
         box.setAlignment(Pos.CENTER);
         return box;
     }
@@ -280,12 +277,29 @@ public class App extends Application implements IAppObserver {
                                     Map<String, Plot> plots, GridPane grid){
         VBox box = new VBox(20, prepareStartButton(givenSimulation),
                 prepareStopButton(givenSimulation), prepareToCSVButton(givenSimulation, handler, doublePlot, plots),
-                prepareShowAnimalsWithGenotype(givenSimulation, grid));
+                prepareShowAnimalsWithGenotypeButton(givenSimulation, grid), prepareStopObservingButton(givenSimulation, grid));
         box.setAlignment(Pos.CENTER);
         return box;
     }
 
-    public Button prepareShowAnimalsWithGenotype(SimulationEngine givenSimulation, GridPane grid){
+    public Button prepareStopObservingButton(SimulationEngine givenSimulation, GridPane grid){
+        Button button = new Button("Stop Observing");
+
+        button.setOnAction(click -> {
+            if (!givenSimulation.ifRunning && givenSimulation.getMap().observedAnimal != null){
+                givenSimulation.getMap().observedAnimal.stopObserving();
+                givenSimulation.getMap().observedAnimal = null;
+                clearGrid(grid);
+                prepareGrid(grid, givenSimulation);
+                prepareAnimalObservedStats(givenSimulation);
+            }
+        });
+
+        button.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        return button;
+    }
+
+    public Button prepareShowAnimalsWithGenotypeButton(SimulationEngine givenSimulation, GridPane grid){
         Button button = new Button("Show animals with dominant genotype");
 
         button.setOnAction(click -> {
@@ -295,6 +309,7 @@ public class App extends Application implements IAppObserver {
             }
         });
 
+        button.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         return button;
     }
 
@@ -315,7 +330,7 @@ public class App extends Application implements IAppObserver {
                 }
             }
         });
-
+        button.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         return button;
     }
 
@@ -323,7 +338,7 @@ public class App extends Application implements IAppObserver {
         Button button = new Button("Stop Simulation");
 
         button.setOnAction(click -> givenSimulation.setIfRunning(false));
-
+        button.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         return button;
     }
 
@@ -331,7 +346,7 @@ public class App extends Application implements IAppObserver {
         Button button = new Button("Start Simulation");
 
         button.setOnAction(click -> givenSimulation.setIfRunning(true));
-
+        button.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         return button;
     }
 
@@ -406,10 +421,10 @@ public class App extends Application implements IAppObserver {
             }
         }
         for (int y = 0; y < height; y++) {
-            grid.getRowConstraints().add(new RowConstraints(20));
+            grid.getRowConstraints().add(new RowConstraints(10, 30, Double.MAX_VALUE));
         }
         for (int x = 0; x < width; x++) {
-            grid.getColumnConstraints().add(new ColumnConstraints(30));
+            grid.getColumnConstraints().add(new ColumnConstraints(10, 30, Double.MAX_VALUE));
         }
     }
 
@@ -425,13 +440,13 @@ public class App extends Application implements IAppObserver {
         statsBox.getChildren().clear();
 
         if (map.observedAnimal == null) return;
-        HBox statsLabelTitle = new HBox(20, getLabelWithBoldText("Observing Stats"));
+        HBox statsLabelTitle = new HBox(10, getLabelWithBoldText("OBSERVING STATS"));
         statsLabelTitle.setAlignment(Pos.CENTER);
         HBox genotype = new HBox(10, getLabelWithBoldText("Genotype"), new Label(map.observedAnimal.getGenes().toString()));
         HBox children = new HBox(10, getLabelWithBoldText("Children"), new Label(valueOf(map.observedAnimal.getChildrenAfterObservingStarts())));
         HBox descendants = new HBox(10, getLabelWithBoldText("Descendants"), new Label(valueOf(map.observedAnimal.getAllDescendantsNumber())));
         HBox deadDate = new HBox(10, getLabelWithBoldText("Dead date"), new Label(map.observedAnimal.getDeadDateString()));
-        HBox numberStatsBox = new HBox(20, children, descendants, deadDate);
+        HBox numberStatsBox = new HBox(10, children, descendants, deadDate);
 
         statsBox.getChildren().addAll(statsLabelTitle, genotype, numberStatsBox);
         statsLabelTitle.setAlignment(Pos.CENTER);
@@ -452,7 +467,7 @@ public class App extends Application implements IAppObserver {
         AbstractMap map = engine.getMap();
 
         if (map.observedAnimal != null && map.observedAnimal.isAlive() && map.observedAnimal.getPosition().equals(position)){
-            circle = new Circle(6);
+            circle = new Circle(circleR);
             circle.setFill(Color.BLUEVIOLET);
             animal = map.observedAnimal;
         }
@@ -463,7 +478,7 @@ public class App extends Application implements IAppObserver {
                     .sorted((a1, a2) -> Float.compare(a1.getEnergy(), a2.getEnergy()))
                     .collect(Collectors.toCollection(ArrayList::new));
             if (!animalsWithDominant.isEmpty()){
-                circle = new Circle(6);
+                circle = new Circle(circleR);
                 animal = animalsWithDominant.get(animalsWithDominant.size()-1);
                 circle.setFill(Color.RED);
             }
@@ -471,7 +486,7 @@ public class App extends Application implements IAppObserver {
 
         if (circle == null){
             List<Animal> positionAnimals = map.getSortedListOfAnimalsOnPosition(position);
-            circle = (positionAnimals.size() != 0) ? new Circle(6) : null;
+            circle = (positionAnimals.size() != 0) ? new Circle(circleR) : null;
             if (circle != null) {
                 animal = positionAnimals.get(positionAnimals.size() - 1);
                 circle.setFill(animal.toColor(startEnergy));
