@@ -31,8 +31,8 @@ public class App extends Application implements IAppObserver {
     private Thread engineWallThread;
     private final GridPane snakeGrid = new GridPane();
     private final GridPane wallGrid = new GridPane();
-    private final VBox wallAnimalObservedStats = new VBox(10);
-    private final VBox snakeAnimalObservedStats = new VBox(10);
+    private final VBox wallAnimalObservedStats = new VBox(5);
+    private final VBox snakeAnimalObservedStats = new VBox(5);
     private final Map<String, String> defaultMenuValues = createDefaultMenuValues();
     private final Map<String, TextField> menuTextFields = new HashMap<>();
     private final Label snakeGenotype = new Label();
@@ -152,8 +152,8 @@ public class App extends Application implements IAppObserver {
         VBox snakeStatsVBox = getSnakeStatsVBox();
         VBox wallStatsVBox = getWallStatsVBox();
 
-        HBox simulationsBox = new HBox(20, snakeStatsVBox, wallStatsVBox);
-        VBox sceneBox = new VBox(20, createMapLegendHBox(), simulationsBox,
+        HBox simulationsBox = new HBox(10, snakeStatsVBox, wallStatsVBox);
+        VBox sceneBox = new VBox(5, createMapLegendHBox(), simulationsBox,
                 getHBoxWithExitSimulationButton(primaryStage));
         simulationsBox.setAlignment(Pos.CENTER);
         sceneBox.setAlignment(Pos.CENTER);
@@ -163,14 +163,14 @@ public class App extends Application implements IAppObserver {
     }
 
     private VBox getWallStatsVBox() {
-        return new VBox(20, prepareMapWithButtonsBox(wallGrid,
+        return new VBox(10, prepareMapWithButtonsBox(wallGrid, "WALL MAP",
                 prepareButtonsBox(wallEngine, wallCSVHandler, wallDoublePlot, wallPlots, wallGrid)),
                 wallAnimalObservedStats,
                 prepareStatsVBox(wallGenotype, wallMagicBorn, wallEngine.getMap(), wallDoublePlot, wallPlots));
     }
 
     private VBox getSnakeStatsVBox() {
-        return new VBox(20, prepareMapWithButtonsBox(snakeGrid,
+        return new VBox(10, prepareMapWithButtonsBox(snakeGrid, "SNAKE MAP",
                 prepareButtonsBox(snakeEngine, snakeCSVHandler, snakeDoublePlot, snakePlots, snakeGrid)),
                 snakeAnimalObservedStats,
                 prepareStatsVBox(snakeGenotype, snakeMagicBorn, snakeEngine.getMap(), snakeDoublePlot, snakePlots));
@@ -215,13 +215,13 @@ public class App extends Application implements IAppObserver {
         HBox hBox = new HBox(20);
 
         for (int i=0; i < rectanglesColors.length; i++){
-            HBox oneLegendField = new HBox(20, new Rectangle(10,10, rectanglesColors[i]), new Label(rectanglesDescriptions[i]));
+            HBox oneLegendField = new HBox(10, new Rectangle(10,10, rectanglesColors[i]), new Label(rectanglesDescriptions[i]));
             oneLegendField.setAlignment(Pos.CENTER);
             hBox.getChildren().add(oneLegendField);
         }
 
         for (int i=0; i < circleColors.length; i++){
-            HBox oneLegendField = new HBox(20, new Circle(5, circleColors[i]), new Label(circleDescription[i]));
+            HBox oneLegendField = new HBox(10, new Circle(5, circleColors[i]), new Label(circleDescription[i]));
             oneLegendField.setAlignment(Pos.CENTER);
             hBox.getChildren().add(oneLegendField);
         }
@@ -295,7 +295,7 @@ public class App extends Application implements IAppObserver {
 
     public VBox prepareStatsVBox(Label givenGenotypeLabel, Label givenMagicBornLabel, AbstractMap map,
                                  DoublePlot doublePlot, Map<String, Plot> plots){
-        HBox title = new HBox(10, getLabelWithBoldText("GENERAL STATS"));
+        HBox title = new HBox(getLabelWithBoldText("GENERAL STATS"));
         title.setAlignment(Pos.CENTER);
 
         givenGenotypeLabel.setText("Dominant genotype: " + map.getTheMostFrequentGenotype().toString());
@@ -328,8 +328,11 @@ public class App extends Application implements IAppObserver {
         return hbox;
     }
 
-    public HBox prepareMapWithButtonsBox(GridPane mapGrid, VBox buttonsBox){
-        HBox box = new HBox(10, mapGrid, buttonsBox);
+    public HBox prepareMapWithButtonsBox(GridPane mapGrid, String nameForGrid, VBox buttonsBox){
+        Label label = getLabelWithBoldText(nameForGrid);
+        VBox gridWithName = new VBox(label, mapGrid);
+        gridWithName.setAlignment(Pos.CENTER);
+        HBox box = new HBox(10, gridWithName, buttonsBox);
         box.setAlignment(Pos.CENTER);
         return box;
     }
