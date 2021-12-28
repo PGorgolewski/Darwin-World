@@ -10,19 +10,19 @@ public class SimulationEngine implements Runnable{
     private final float minReproductionEnergy;
     private final int startEnergy;
     private final boolean ifMagicBorn;
-    private int magicBornCounter = 0;
+    private final int moveDelay;
     private final AbstractMap map;
+    private int currAnimalsNumber;
+    private final IAppObserver observer;
+    private int magicBornCounter = 0;
     boolean ifRunning = false;
     boolean finished = false;
+    private int currDay = 0;
+    private int deadAnimalsCounter = 0;
+    private float averageLifetime = 0;
     private final Set<Animal> allAnimals = new HashSet<>();
     private final Set<Animal> deadAnimals = new HashSet<>();
     private final Set<Vector2d> positionsWithAnimalAndGrass = new HashSet<>();
-    private final IAppObserver observer;
-    private final int moveDelay;
-    private int currDay=0;
-    private int currAnimalsNumber;
-    private int deadAnimalsCounter=0;
-    private float averageLifetime = 0;
 
     public SimulationEngine(int mapWidth, int mapHeight, float jungleRatio, int startingAnimalsNumber, int startEnergy,
                             int moveEnergy, int grassEnergy, int moveDelay, boolean ifMagicBorn, boolean ifWallMap,
@@ -42,16 +42,14 @@ public class SimulationEngine implements Runnable{
 
     @Override
     public void run() {
-        int counter = 0;
         while(allAnimals.size() > 0 && !finished){
-            System.out.println(counter++);
-            this.waitForStartButton();
-            this.deleteDeadAnimals();
-            this.moveEachAnimal();
-            this.eatGrasses();
-            this.animalReproduction();
-            this.map.grassGrowing(this.grassEnergy);
-            this.updateMap();
+            waitForStartButton();
+            deleteDeadAnimals();
+            moveEachAnimal();
+            eatGrasses();
+            animalReproduction();
+            map.grassGrowing(grassEnergy);
+            updateMap();
         }
     }
 
@@ -60,7 +58,7 @@ public class SimulationEngine implements Runnable{
             while (!ifRunning){
                 try {
                     wait();
-                } catch (InterruptedException e) {
+                }catch (InterruptedException e) {
                     e.printStackTrace();
                 }
             }
@@ -68,52 +66,62 @@ public class SimulationEngine implements Runnable{
     }
 
     public void magicBorn(){
-        List<Animal> parents = this.allAnimals.stream().
-                filter(a -> !deadAnimals.contains(a)).
-                collect(Collectors.toCollection(ArrayList::new));
+        List<Animal> parents = allAnimals.stream().
+                filter(a -> !deadAnimals.contains(a))
+                .collect(Collectors.toCollection(ArrayList::new));
 
         if (parents.size() != 5) return;
+
         magicBornCounter++;
-        List<Vector2d> positionsWithoutAnimals = this.map.getPositionsWithoutAnimals();
+        List<Vector2d> positionsWithoutAnimals = map.getPositionsWithoutAnimals();
         magicReproduction(positionsWithoutAnimals, parents);
     }
 
     protected void magicReproduction(List<Vector2d> freePositions, List<Animal> parents){
         for (Animal parent: parents){
             int randomNumber = ThreadLocalRandom.current().nextInt(0, freePositions.size());
-            Animal magicBabyAnimal = new Animal(freePositions.get(randomNumber), this.map, parent, this.startEnergy,
-                    this.map, this.currDay);
-            this.allAnimals.add(magicBabyAnimal);
-            this.map.placeElement(magicBabyAnimal);
-            this.currAnimalsNumber++;
+            Animal magicBabyAnimal = new Animal(freePositions.get(randomNumber), map, parent, startEnergy,
+                    map, currDay);
+            allAnimals.add(magicBabyAnimal);
+            map.placeElement(magicBabyAnimal);
+            currAnimalsNumber++;
             freePositions.remove(randomNumber);
             }
-
         }
 
     public void animalReproduction(){
-        if (ifMagicBorn && magicBornCounter < 3) magicBorn();
-        Map<Vector2d, List<Animal>> positionsByAnimals = this.map.getPositionsByAnimalsMap(2,
-                this.minReproductionEnergy);
+        Map<Vector2d, List<Animal>> positionsByAnimals = map.getPositionsByAnimalsMap(2,
+                minReproductionEnergy);
 
         positionsByAnimals.forEach((k, v) -> {
             List<Animal> aliveAnimals = v.stream()
-                    .filter(e -> !this.deadAnimals.contains(e))
+                    .filter(e -> !deadAnimals.contains(e))
                     .sorted((a1, a2) -> Float.compare(a1.getEnergy(), a2.getEnergy()))
                     .collect(Collectors.toCollection(ArrayList::new));
 
             if (aliveAnimals.size() >= 2){
-                Collections.reverse(aliveAnimals);
-                Animal babyAnimal = new Animal(aliveAnimals.get(0), aliveAnimals.get(1), this.map, this.map, this.currDay);
-                aliveAnimals.get(0).setChildrenNumber(aliveAnimals.get(0).getChildrenNumber()+1);
-                aliveAnimals.get(1).setChildrenNumber(aliveAnimals.get(1).getChildrenNumber()+1);
-                allAnimals.add(babyAnimal);
-                this.map.placeElement(babyAnimal);
-                this.currAnimalsNumber++;
-                addToChildrenListIfParentObserved(aliveAnimals.get(0), babyAnimal);
-                addToChildrenListIfParentObserved(aliveAnimals.get(1), babyAnimal);
+                givingBirth(aliveAnimals);
             }
         });
+
+        if (ifMagicBorn && magicBornCounter < 3) magicBorn();
+    }
+
+    private void givingBirth(List<Animal> aliveAnimals) {
+        Collections.reverse(aliveAnimals);
+        Animal dad = aliveAnimals.get(0);
+        Animal mom = aliveAnimals.get(1);
+        Animal child = new Animal(dad, mom, map, map, currDay);
+
+        allAnimals.add(child);
+        map.placeElement(child);
+        currAnimalsNumber++;
+
+        dad.setChildrenNumber(dad.getChildrenNumber()+1);
+        mom.setChildrenNumber(mom.getChildrenNumber()+1);
+
+        addToChildrenListIfParentObserved(dad, child);
+        addToChildrenListIfParentObserved(mom, child);
     }
 
     public void addToChildrenListIfParentObserved(Animal parent, Animal child){
@@ -124,18 +132,19 @@ public class SimulationEngine implements Runnable{
     }
 
     public void eatGrasses(){
-        this.positionsWithAnimalAndGrass.forEach(position -> {
-            List<Animal> animals = this.map.getSortedListOfAnimalsOnPosition(position);
-            Grass grass = this.map.grassMap.get(position);
+        positionsWithAnimalAndGrass.forEach(position -> {
+            List<Animal> animals = map.getSortedListOfAnimalsOnPositionDesc(position);
+            Grass grass = map.grassMap.get(position);
 
-            List<Animal> theStrongestAnimalsList = this.getTheStrongestAnimals(animals);
+            List<Animal> theStrongestAnimalsList = getTheStrongestAnimals(animals);
             if (theStrongestAnimalsList != null){
                 float energyPerAnimal = Objects.requireNonNull(grass).getEnergy() / theStrongestAnimalsList.size();
                 theStrongestAnimalsList.forEach(animal -> animal.setEnergy(animal.getEnergy() + energyPerAnimal));
-                this.map.removeElement(grass, position);
+                map.removeElement(grass, position);
             }
         });
-        this.positionsWithAnimalAndGrass.clear();
+
+        positionsWithAnimalAndGrass.clear();
     }
 
     public List<Animal> getTheStrongestAnimals(List<Animal> animals){
@@ -152,73 +161,71 @@ public class SimulationEngine implements Runnable{
     }
 
     public void moveEachAnimal(){
-        for (Animal currentAnimal: this.allAnimals){
-            if (this.ifAnimalCanMove(currentAnimal)){
+        for (Animal currentAnimal: allAnimals){
+            if (ifAnimalCanMove(currentAnimal)){
                 Vector2d beforeMovePosition = currentAnimal.getPosition();
-                currentAnimal.move(this.moveEnergy);
+                currentAnimal.move(moveEnergy);
                 Vector2d afterMovePosition = currentAnimal.getPosition();
-                if (beforeMovePosition != afterMovePosition && this.map.isGrassOnPosition(afterMovePosition)){
-                    this.positionsWithAnimalAndGrass.add(afterMovePosition);
-                }
+                if (beforeMovePosition != afterMovePosition && map.isGrassOnPosition(afterMovePosition))
+                    positionsWithAnimalAndGrass.add(afterMovePosition);
             }else{
                 currentAnimal.setAsDead();
-                this.deadAnimals.add(currentAnimal);
+                deadAnimals.add(currentAnimal);
             }
         }
     }
 
-    public boolean ifAnimalCanMove(Animal animal){
-        return animal.getEnergy() >= this.moveEnergy;
-    }
-
     public void deleteDeadAnimals(){
-        for (Animal deadAnimal: new HashSet<>(this.deadAnimals)){
-            this.deadAnimalsCounter++;
-            this.updateLifetime(deadAnimal);
-            this.map.removeElement(deadAnimal, deadAnimal.getPosition());
-            this.allAnimals.remove(deadAnimal);
+        for (Animal deadAnimal: new HashSet<>(deadAnimals)){
+            deadAnimalsCounter++;
+            updateAverageLifetime(deadAnimal);
+            map.removeElement(deadAnimal, deadAnimal.getPosition());
+            allAnimals.remove(deadAnimal);
         }
-        this.currAnimalsNumber -= this.deadAnimals.size();
-        this.deadAnimals.clear();
+
+        currAnimalsNumber -= deadAnimals.size();
+        deadAnimals.clear();
     }
 
-    public void updateLifetime(Animal deadAnimal){
-        this.averageLifetime = this.averageLifetime * ((float) (this.deadAnimalsCounter-1)/this.deadAnimalsCounter) +
-                (float) deadAnimal.getLifetime()/this.deadAnimalsCounter;
+    public void updateAverageLifetime(Animal deadAnimal){
+        averageLifetime = averageLifetime * ((float) (deadAnimalsCounter-1)/deadAnimalsCounter) +
+                (float) deadAnimal.getLifetime()/deadAnimalsCounter;
     }
 
     public void createFirstAnimals(int startingAnimalsNumber, int startEnergy){
-        Set<Vector2d> allFreePositionsSet = new HashSet<>(this.map.jungleFreePositions);
-        allFreePositionsSet.addAll(this.map.stepFreePositions);
-        System.out.println(allFreePositionsSet);
+        Set<Vector2d> allFreePositionsSet = new HashSet<>(map.jungleFreePositions);
+        allFreePositionsSet.addAll(map.stepFreePositions);
+        List<Vector2d> allFreePositionsList = new ArrayList<>(allFreePositionsSet);
+        
         for (int i = 0; i < startingAnimalsNumber; i++){
-            List<Vector2d> allFreePositionsList = new ArrayList<>(allFreePositionsSet);
-            System.out.println(allFreePositionsList.size());
             int randomNum = ThreadLocalRandom.current().nextInt(0, allFreePositionsList.size());
-            Animal newAnimal = new Animal(new Vector2d(allFreePositionsList.get(randomNum)), this.map, startEnergy, this.map, this.currDay);
-            this.map.placeElement(newAnimal);
-            allFreePositionsSet.remove(allFreePositionsList.get(randomNum));
+            Animal newAnimal = new Animal(new Vector2d(allFreePositionsList.get(randomNum)), map,
+                    startEnergy, map, currDay);
+            
+            map.placeElement(newAnimal);
+            allAnimals.add(newAnimal);
 
-            this.allAnimals.add(newAnimal);
+            allFreePositionsList.remove(randomNum);
         }
     }
 
     public float getAverageEnergy(){
         float sumOfEnergy = 0;
         int counter = 0;
-        for (Animal animal: this.allAnimals) {
-            if (this.deadAnimals.contains(animal)) continue;
+        for (Animal animal: allAnimals) {
+            if (deadAnimals.contains(animal)) continue;
             sumOfEnergy += animal.getEnergy();
             counter++;
         }
+        
         return sumOfEnergy / counter;
     }
 
     public float getAverageChildrenNumber(){
         int sumOfChildren = 0;
         int counter = 0;
-        for (Animal animal: this.allAnimals) {
-            if (this.deadAnimals.contains(animal)) continue;
+        for (Animal animal: allAnimals) {
+            if (deadAnimals.contains(animal)) continue;
             sumOfChildren += animal.getChildrenNumber();
             counter++;
         }
@@ -226,21 +233,17 @@ public class SimulationEngine implements Runnable{
     }
 
     public void updateMap(){
-        this.currDay++;
-        int currGrassNumber = this.map.grassMap.size();
+        currDay++;
+        int currentGrassAmount = map.grassMap.size();
 
-        this.observer.show(this.map, this.currDay, this.currAnimalsNumber, currGrassNumber, getAverageEnergy(),
-                this.averageLifetime, getAverageChildrenNumber(), this.magicBornCounter);
+        observer.show(map, currDay, currAnimalsNumber, currentGrassAmount, getAverageEnergy(),
+                averageLifetime, getAverageChildrenNumber(), magicBornCounter);
 
         try {
-            Thread.sleep(this.moveDelay);
+            Thread.sleep(moveDelay);
         } catch (InterruptedException e) {
             System.out.println("The simulation has stopped");
         }
-    }
-
-    public AbstractMap getMap() {
-        return map;
     }
 
     public void setIfRunning(boolean ifRunning) {
@@ -248,6 +251,13 @@ public class SimulationEngine implements Runnable{
             this.ifRunning = ifRunning;
             notifyAll();
         }
+    }
 
+    public boolean ifAnimalCanMove(Animal animal){
+        return animal.getEnergy() >= moveEnergy;
+    }
+
+    public AbstractMap getMap() {
+        return map;
     }
 }

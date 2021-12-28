@@ -1,13 +1,13 @@
 package darwin;
 
 import javafx.scene.control.TextField;
-
 import java.util.HashMap;
 import java.util.Map;
 
 public class OptionParser {
     public static Map<String, Number> parseArguments(Map <String, TextField> menuTextFields) throws Exception {
         Map<String, Number> menuParsedMap = new HashMap<>();
+
         for (String optionName: menuTextFields.keySet()){
             if (optionName.equals("Use magic born [yes/no]"))
                 menuParsedMap.put(optionName, parseMagicBorn(menuTextFields.get(optionName).getText()));
@@ -33,15 +33,16 @@ public class OptionParser {
         if (ratio < 0 || ratio > 1){
             throw new Exception("Jungle ratio must be between 0 and 1");
         }
+
         return ratio;
     }
 
     public static Number parseIntegerValues(String textFieldText) throws Exception {
         int inputParsedToInt = Integer.parseInt(textFieldText);
+
         if (inputParsedToInt < 0){
             throw new Exception(textFieldText + " can't be less than 0");
         }
-        return Integer.parseInt(textFieldText);
+        return inputParsedToInt;
     }
-
 }

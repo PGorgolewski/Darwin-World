@@ -10,12 +10,12 @@ import static java.lang.String.valueOf;
 
 public class Animal extends AbstractMapElement {
     private MapDirections orient;
-    private final List<Integer> genes = new ArrayList<>();
     private final int birthDay;
     private int lifetime = 0;
     private boolean isAlive = true;
     private int childrenNumber = 0;
     public boolean isObserved = false;
+    private final List<Integer> genes = new ArrayList<>();
     private final List<Animal> childrenAfterObservingStarts = new ArrayList<>();
 
     //INITIAL BORN
@@ -43,7 +43,8 @@ public class Animal extends AbstractMapElement {
     }
 
     //MAGIC BORN
-    public Animal(Vector2d startPosition, AbstractMap map, Animal animalToCopy, int startEnergy, IObserver observer, int birthDay){
+    public Animal(Vector2d startPosition, AbstractMap map, Animal animalToCopy,
+                  int startEnergy, IObserver observer, int birthDay){
         this.position = startPosition;
         this.orient = animalToCopy.getOrient();
         this.map = map;
@@ -54,59 +55,61 @@ public class Animal extends AbstractMapElement {
     }
 
     public void move(int moveEnergy) {
-        int directionNumber = this.genes.get(ThreadLocalRandom.current().nextInt(0, 32));
+        int directionNumber = genes.get(ThreadLocalRandom.current().nextInt(0, 32));
 
         if (directionNumber == 0) moveForward();
         else if (directionNumber == 4) moveBackward();
-        else this.orient = this.orient.getDirectionAfterRotation(directionNumber);
+        else orient = orient.getDirectionAfterRotation(directionNumber);
 
-        this.energy -= moveEnergy;
-        this.lifetime++;
+        energy -= moveEnergy;
+        lifetime++;
     }
 
     public void moveForward() {
-        Vector2d oldPosition = new Vector2d(this.position);
-        if (this.map instanceof WallMap) {
-            this.setPosition(this.validatePositionForWall(this.position.add(this.orient.toUnitVector())));
-        } else {
-            this.setPosition(this.validatePositionForSnake(this.position.add(this.orient.toUnitVector())));
-        }
-        this.observer.positionChanged(this, oldPosition);
+        Vector2d oldPosition = new Vector2d(position);
+
+        if (map.isFenced)
+            setPosition(validatePositionWhenFenced(position.add(orient.toUnitVector())));
+        else
+            setPosition(validatePositionWhenNotFenced(position.add(orient.toUnitVector())));
+
+        observer.positionChanged(this, oldPosition);
     }
 
     public void moveBackward(){
-        Vector2d oldPosition = new Vector2d(this.position);
-        if (this.map instanceof WallMap) {
-            this.setPosition(this.validatePositionForWall(this.position.subtract(this.orient.toUnitVector())));
-        } else {
-            this.setPosition(this.validatePositionForSnake(this.position.subtract(this.orient.toUnitVector())));
-        }
-        this.observer.positionChanged(this, oldPosition);
+        Vector2d oldPosition = new Vector2d(position);
+
+        if (map.isFenced)
+            setPosition(validatePositionWhenFenced(position.subtract(orient.toUnitVector())));
+        else
+            setPosition(validatePositionWhenNotFenced(position.subtract(orient.toUnitVector())));
+
+        observer.positionChanged(this, oldPosition);
     }
 
-    public Vector2d validatePositionForWall(Vector2d potentialVector){
+    public Vector2d validatePositionWhenFenced(Vector2d potentialVector){
         int x = potentialVector.getX();
         int y = potentialVector.getY();
 
         if (x < 0) x = 0;
-        else if (x >= this.map.getWidth()) x = this.map.getWidth() - 1;
+        else if (x >= map.getWidth()) x = map.getWidth() - 1;
 
         if (y < 0) y = 0;
-        else if (y >= this.map.getHeight()) y = this.map.getHeight() - 1;
+        else if (y >= map.getHeight()) y = map.getHeight() - 1;
 
         return new Vector2d(x, y);
     }
 
-    public Vector2d validatePositionForSnake(Vector2d potentialVector){
+    public Vector2d validatePositionWhenNotFenced(Vector2d potentialVector){
         int x = potentialVector.getX();
         int y = potentialVector.getY();
 
-        x %= this.map.getWidth();
-        y %= this.map.getHeight();
+        x %= map.getWidth();
+        y %= map.getHeight();
 
         //resolving problem of (-1)%10=(-1) not 9
-        if (x<0) x+=this.map.getWidth();
-        if (y<0) y+=this.map.getHeight();
+        if (x<0) x+=map.getWidth();
+        if (y<0) y+=map.getHeight();
 
         return new Vector2d(x, y);
     }
@@ -135,48 +138,26 @@ public class Animal extends AbstractMapElement {
                 .forEach(index -> occurrences.set(index, occurrences.get(index)+1));
 
         IntStream.range(0, occurrences.size()).forEach(index -> {
-            List<Integer> oneGenList = Stream.generate(() -> index).limit(occurrences.get(index))
+            List<Integer> oneGenList = Stream.generate(() -> index)
+                    .limit(occurrences.get(index))
                     .collect(Collectors.toList());
-            this.genes.addAll(oneGenList);
+
+            genes.addAll(oneGenList);
         });
     }
 
     private void getGenotypeFromParents(Animal dad, Animal mom){
-        boolean ifDadShouldBeFirst = new Random().nextBoolean();
+        boolean dadGenesOnTheLeft = new Random().nextBoolean();
 
         int numberOfDadGens = Math.round(32 * (dad.getEnergy() / (dad.getEnergy() + mom.getEnergy())));
 
-        if (ifDadShouldBeFirst) {
-            this.genes.addAll(dad.getGenes().subList(0,numberOfDadGens));
-            this.genes.addAll(mom.getGenes().subList(numberOfDadGens,32));
-        } else {
-            this.genes.addAll(mom.getGenes().subList(0,32-numberOfDadGens));
-            this.genes.addAll(dad.getGenes().subList(32-numberOfDadGens,32));
+        if (dadGenesOnTheLeft) {
+            genes.addAll(dad.getGenes().subList(0,numberOfDadGens));
+            genes.addAll(mom.getGenes().subList(numberOfDadGens,32));
+        }else {
+            genes.addAll(mom.getGenes().subList(0,32-numberOfDadGens));
+            genes.addAll(dad.getGenes().subList(32-numberOfDadGens,32));
         }
-    }
-
-    public List<Integer> getGenes() {
-        return genes;
-    }
-
-    public MapDirections getOrient() {
-        return orient;
-    }
-
-    public int getLifetime() {
-        return lifetime;
-    }
-
-    public int getChildrenNumber() {
-        return childrenNumber;
-    }
-
-    public void setChildrenNumber(int childrenNumber) {
-        this.childrenNumber = childrenNumber;
-    }
-
-    public void setObserved(boolean observed) {
-        isObserved = observed;
     }
 
     public void stopObserving(){
@@ -193,9 +174,11 @@ public class Animal extends AbstractMapElement {
 
     public Set<Animal> createSetOfAllDescendants(){
         Set<Animal> descendants = new HashSet<>(childrenAfterObservingStarts);
+
         for (Animal child: childrenAfterObservingStarts){
             descendants.addAll(child.createSetOfAllDescendants());
         }
+
         return descendants;
     }
 
@@ -203,15 +186,23 @@ public class Animal extends AbstractMapElement {
         return createSetOfAllDescendants().size();
     }
 
-    public int getChildrenAfterObservingStarts(){
+    public int getChildrenNumberAfterObservingStarts(){
         return childrenAfterObservingStarts.size();
     }
 
     public String getDeadDateString(){
         if (isAlive)
-            return "is alived";
+            return "is alive";
 
         return valueOf(birthDay+lifetime);
+    }
+
+    public void setChildrenNumber(int childrenNumber) {
+        this.childrenNumber = childrenNumber;
+    }
+
+    public void setObserved(boolean observed) {
+        isObserved = observed;
     }
 
     public void setAsDead(){
@@ -220,5 +211,21 @@ public class Animal extends AbstractMapElement {
 
     public boolean isAlive() {
         return isAlive;
+    }
+
+    public List<Integer> getGenes() {
+        return genes;
+    }
+
+    public MapDirections getOrient() {
+        return orient;
+    }
+
+    public int getLifetime() {
+        return lifetime;
+    }
+
+    public int getChildrenNumber() {
+        return childrenNumber;
     }
 }

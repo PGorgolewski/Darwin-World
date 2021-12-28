@@ -3,20 +3,19 @@ package darwin;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
-
 import java.util.ArrayList;
 import java.util.List;
 
 public class Plot {
-    private NumberAxis xAxis = new NumberAxis();
-    private NumberAxis yAxis = new NumberAxis();
-    private final XYChart.Series<Number, Number> series = new XYChart.Series<>();
+    private final LineChart<Number, Number> lineChart;
     private static final int maxPoints = 25;
     private int firstDayInPlot = 0;
-    private final LineChart<Number, Number> lineChart;
+    private final NumberAxis xAxis = new NumberAxis();
+    private final XYChart.Series<Number, Number> series = new XYChart.Series<>();
     private final List<Number> allValues = new ArrayList<>();
 
     public Plot(String seriesName, Number firstValueOfSeries){
+        NumberAxis yAxis = new NumberAxis();
         lineChart = new LineChart<>(xAxis, yAxis);
         series.setName(seriesName);
         lineChart.getData().add(series);
@@ -29,9 +28,10 @@ public class Plot {
     public void updatePlot(int day, Number value){
         series.getData().add(new XYChart.Data<>(day, value));
         allValues.add(value);
+
         if (series.getData().size() > maxPoints){
-            series.getData().remove(0);
             firstDayInPlot++;
+            series.getData().remove(0);
             xAxis.setLowerBound(firstDayInPlot);
             xAxis.setUpperBound(maxPoints+firstDayInPlot);
         }

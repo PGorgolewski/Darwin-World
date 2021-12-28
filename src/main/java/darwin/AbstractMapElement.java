@@ -8,22 +8,6 @@ abstract class AbstractMapElement {
     protected float energy;
     protected IObserver observer;
 
-    public Vector2d getPosition(){
-        return this.position;
-    }
-
-    public void setPosition(Vector2d position) {
-        this.position = position;
-    }
-
-    public float getEnergy() {
-        return energy;
-    }
-
-    public void setEnergy(float energy) {
-        this.energy = energy;
-    }
-
     public Color toColor(int startEnergy) {
         if (energy == 0) return Color.rgb(222, 221, 224);
         if (energy < 0.2 * startEnergy) return Color.rgb(224, 179, 173);
@@ -37,5 +21,21 @@ abstract class AbstractMapElement {
         if (energy < 8 * startEnergy) return Color.rgb(88, 50, 44);
         if (energy < 10 * startEnergy) return Color.rgb(74, 42, 37);
         return Color.rgb(55, 31, 27);
+    }
+
+    public Vector2d getPosition(){
+        return position;
+    }
+
+    public float getEnergy() {
+        return energy;
+    }
+
+    public void setPosition(Vector2d position) {
+        this.position = position;
+    }
+
+    public void setEnergy(float energy) {
+        this.energy = energy;
     }
 }

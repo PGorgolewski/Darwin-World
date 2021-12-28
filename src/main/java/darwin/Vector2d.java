@@ -6,14 +6,6 @@ public class Vector2d {
     final public int x;
     final public int y;
 
-    public int getX() {
-        return x;
-    }
-
-    public int getY() {
-        return y;
-    }
-
     public Vector2d(int x, int y) {
         this.x = x;
         this.y = y;
@@ -68,6 +60,18 @@ public class Vector2d {
         return new Vector2d(newX, newY);
     }
 
+    public Vector2d opposite(){
+        return new Vector2d(x * (-1), y * (-1));
+    }
+
+    public int getX() {
+        return x;
+    }
+
+    public int getY() {
+        return y;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -79,10 +83,6 @@ public class Vector2d {
     @Override
     public int hashCode() {
         return Objects.hash(x, y);
-    }
-
-    public Vector2d opposite(){
-        return new Vector2d(x * (-1), y * (-1));
     }
 
     @Override

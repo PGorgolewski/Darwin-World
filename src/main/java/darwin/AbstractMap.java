@@ -9,6 +9,7 @@ abstract class AbstractMap implements IObserver{
     protected final int height;
     protected final Vector2d jungleLowerLeft;
     protected final Vector2d jungleUpperRight;
+    protected boolean isFenced;
     protected final Set<Vector2d> jungleFreePositions = new HashSet<>();
     protected final Set<Vector2d> stepFreePositions = new HashSet<>();
     protected final Map<Vector2d, Grass> grassMap = new HashMap<>();
@@ -16,35 +17,37 @@ abstract class AbstractMap implements IObserver{
     protected final Map<List<Integer>, Integer> genotypeOccurrences = new HashMap<>();
     protected Animal observedAnimal = null;
 
+
     protected AbstractMap(int width, int height, float jungleRatio) {
         this.width = width;
         this.height = height;
-        int jungleWidth = Math.round(this.width * jungleRatio);
-        int jungleHeight = Math.round(this.height * jungleRatio);
-        this.jungleLowerLeft = new Vector2d((this.width - jungleWidth) / 2, (this.height - jungleHeight) / 2);
-        this.jungleUpperRight = new Vector2d(this.jungleLowerLeft.getX() + jungleWidth - 1,
-                this.jungleLowerLeft.getY() + jungleHeight - 1);
+        int jungleWidth = Math.round(width * jungleRatio);
+        int jungleHeight = Math.round(height * jungleRatio);
+        jungleLowerLeft = new Vector2d((width - jungleWidth) / 2, (height - jungleHeight) / 2);
+        jungleUpperRight = new Vector2d(jungleLowerLeft.getX() + jungleWidth - 1,
+                jungleLowerLeft.getY() + jungleHeight - 1);
 
-        this.initialAddingAllPositionsAsFree();
+        initialAddingAllPositionsAsFree();
     }
 
     protected void initialAddingAllPositionsAsFree(){
-        for (int x = 0; x < this.width; x++){
-            for (int y = 0; y < this.height; y++){
-                Vector2d currVector = new Vector2d(x,y);
-                if (isPositionInJungle(currVector)){
-                    this.jungleFreePositions.add(currVector);
-                }else {
-                    this.stepFreePositions.add(currVector);
-                }
-                this.animalMap.put(currVector, new HashSet<>());
+        for (int x = 0; x < width; x++){
+            for (int y = 0; y < height; y++){
+                Vector2d currVector = new Vector2d(x, y);
+
+                if (isPositionInJungle(currVector))
+                    jungleFreePositions.add(currVector);
+                else
+                    stepFreePositions.add(currVector);
+
+                animalMap.put(currVector, new HashSet<>());
             }
         }
     }
 
     protected void grassGrowing(int grassEnergy){
-        grassGrowingForGivenArea(this.jungleFreePositions, grassEnergy);
-        grassGrowingForGivenArea(this.stepFreePositions, grassEnergy);
+        grassGrowingForGivenArea(jungleFreePositions, grassEnergy);
+        grassGrowingForGivenArea(stepFreePositions, grassEnergy);
     }
 
     protected void grassGrowingForGivenArea(Set<Vector2d> freePositions, int grassEnergy){
@@ -58,110 +61,116 @@ abstract class AbstractMap implements IObserver{
                     randomPosition = position;
                     break;
                 }
+
                 currentIndex++;
             }
 
-            this.placeElement(new Grass(randomPosition, this, grassEnergy, this));
+            placeElement(new Grass(randomPosition, this, grassEnergy, this));
         }
     }
 
     protected void addToGenotypeMap(List<Integer> genes){
-        if (this.genotypeOccurrences.containsKey(genes))
-            this.genotypeOccurrences.replace(genes, this.genotypeOccurrences.get(genes) + 1);
+        if (genotypeOccurrences.containsKey(genes))
+            genotypeOccurrences.replace(genes, genotypeOccurrences.get(genes) + 1);
         else
-            this.genotypeOccurrences.put(genes, 1);
+            genotypeOccurrences.put(genes, 1);
     }
 
     protected void removeFromGenotypeMap(List<Integer> genes){
-        this.genotypeOccurrences.replace(genes, this.genotypeOccurrences.get(genes) - 1);
-        if (this.genotypeOccurrences.get(genes) == 0)
-            this.genotypeOccurrences.remove(genes);
+        genotypeOccurrences.replace(genes, genotypeOccurrences.get(genes) - 1);
+        if (genotypeOccurrences.get(genes) == 0)
+            genotypeOccurrences.remove(genes);
     }
 
     protected void placeElement(AbstractMapElement mapElement){
         Vector2d elementVector = mapElement.getPosition();
-        if (isPositionInJungle(elementVector)){
-            this.placeElementForGivenMap(mapElement, elementVector, this.jungleFreePositions);
-        }else {
-            this.placeElementForGivenMap(mapElement, elementVector,  this.stepFreePositions);
-        }
-        if (mapElement instanceof Animal) this.addToGenotypeMap(((Animal) mapElement).getGenes());
+
+        if (isPositionInJungle(elementVector))
+            placeElementForGivenMap(mapElement, elementVector, jungleFreePositions);
+        else
+            placeElementForGivenMap(mapElement, elementVector,  stepFreePositions);
+
+        if (mapElement instanceof Animal) addToGenotypeMap(((Animal) mapElement).getGenes());
     }
 
-    protected void placeElementForGivenMap(AbstractMapElement mapElement, Vector2d elementVector, Set<Vector2d> givenSet){
-        givenSet.remove(elementVector);
-        if (mapElement instanceof Animal){
-            this.animalMap.get(elementVector).add((Animal) mapElement);
-        }else{
-            this.grassMap.put(elementVector, (Grass) mapElement);
-        }
+    protected void placeElementForGivenMap(AbstractMapElement mapElement, Vector2d elementVector,
+                                           Set<Vector2d> givenFreePositionsSet){
+        givenFreePositionsSet.remove(elementVector);
+
+        if (mapElement instanceof Animal)
+            animalMap.get(elementVector).add((Animal) mapElement);
+        else
+            grassMap.put(elementVector, (Grass) mapElement);
     }
 
     protected void removeElement(AbstractMapElement mapElement, Vector2d elementPosition){
-        if (isPositionInJungle(elementPosition)){
-            this.removeGivenElement(mapElement, elementPosition, this.jungleFreePositions);
-        }else {
-            this.removeGivenElement(mapElement, elementPosition, this.stepFreePositions);
-        }
-        if (mapElement instanceof Animal) this.removeFromGenotypeMap(((Animal) mapElement).getGenes());
+        if (isPositionInJungle(elementPosition))
+            removeGivenElement(mapElement, elementPosition, jungleFreePositions);
+        else
+            removeGivenElement(mapElement, elementPosition, stepFreePositions);
+
+
+        if (mapElement instanceof Animal) removeFromGenotypeMap(((Animal) mapElement).getGenes());
     }
 
     protected void removeGivenElement(AbstractMapElement mapElement, Vector2d elementPosition,
                                       Set<Vector2d> givenFreePositions){
-        if (mapElement instanceof Animal){
-            this.animalMap.get(elementPosition).remove(mapElement);
-        }else {
-            this.grassMap.remove(elementPosition);
-        }
+        if (mapElement instanceof Animal)
+            animalMap.get(elementPosition).remove(mapElement);
+        else
+            grassMap.remove(elementPosition);
 
-        if (this.animalMap.get(elementPosition).size() == 0 && !this.grassMap.containsKey(elementPosition)){
+
+        if (animalMap.get(elementPosition).size() == 0 && !grassMap.containsKey(elementPosition))
             givenFreePositions.add(elementPosition);
-        }
+
     }
 
     protected boolean isPositionInJungle(Vector2d position){
-        return this.jungleLowerLeft.precedes(position) && this.jungleUpperRight.follows(position);
+        return jungleLowerLeft.precedes(position) && jungleUpperRight.follows(position);
     }
 
-    public int getHeight() {
-        return height;
-    }
-
-    public int getWidth() {
-        return width;
-    }
-
-    public Set<Animal> getAnimalsFromGivenPosition(Vector2d position) {
-        return this.animalMap.get(position);
+    public Set<Animal> getAnimalsFromGivenPosition(Vector2d position){
+        return animalMap.get(position);
     }
 
     public List<Animal> getSortedListOfAnimalsOnPosition(Vector2d position){
-        return this.getAnimalsFromGivenPosition(position).stream()
+        return getAnimalsFromGivenPosition(position).stream()
                 .sorted((a1, a2) -> Float.compare(a1.getEnergy(), a2.getEnergy()))
                 .collect(Collectors.toCollection(ArrayList::new));
     }
 
+    public List<Animal> getSortedListOfAnimalsOnPositionDesc(Vector2d position){
+        List<Animal> animalsList = getSortedListOfAnimalsOnPosition(position);
+        Collections.reverse(animalsList);
+        return animalsList;
+    }
+
     protected Map<Vector2d, List<Animal>> getPositionsByAnimalsMap(int minAnimals, float minEnergy){
         Map<Vector2d, List<Animal>> positionsByAnimals = new HashMap<>();
-        this.animalMap.forEach((k,v) -> {
+
+        animalMap.forEach((k,v) -> {
             List<Animal> animalsOnPosition = v.stream()
                     .filter(e -> (e.getEnergy() >= minEnergy))
                     .collect(Collectors.toCollection(ArrayList::new));
 
-            if (animalsOnPosition.size() >= minAnimals){
+            if (animalsOnPosition.size() >= minAnimals)
                 positionsByAnimals.put(k,animalsOnPosition);
-            }
+
         });
+
         return positionsByAnimals;
     }
 
     protected List<Vector2d> getPositionsWithoutAnimals(){
         List<Vector2d> positionsWithoutAnimals = new ArrayList<>();
-        this.animalMap.forEach((k,v) -> {
+
+        animalMap.forEach((k,v) -> {
             if (v.size() == 0){
                 positionsWithoutAnimals.add(k);
             }
         });
+
         return positionsWithoutAnimals;
     }
 
@@ -169,7 +178,7 @@ abstract class AbstractMap implements IObserver{
         List<Integer> theMostFrequent = new ArrayList<>();
         int maxOccurrences = 0;
 
-        for (List<Integer> genotype: this.genotypeOccurrences.keySet()){
+        for (List<Integer> genotype: genotypeOccurrences.keySet()){
             if (genotypeOccurrences.get(genotype) > maxOccurrences){
                 maxOccurrences = genotypeOccurrences.get(genotype);
                 theMostFrequent = genotype;
@@ -180,13 +189,20 @@ abstract class AbstractMap implements IObserver{
     }
 
     public void positionChanged(AbstractMapElement element, Vector2d oldPosition){
-        this.removeElement(element, oldPosition);
-        if (element instanceof Animal){
-            this.placeElement(element);
-        }
+        removeElement(element, oldPosition);
+        if (element instanceof Animal)
+            placeElement(element);
     }
 
     protected boolean isGrassOnPosition(Vector2d position){
-        return this.grassMap.containsKey(position);
+        return grassMap.containsKey(position);
+    }
+
+    public int getHeight(){
+        return height;
+    }
+
+    public int getWidth(){
+        return width;
     }
 }

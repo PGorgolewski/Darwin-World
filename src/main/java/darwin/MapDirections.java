@@ -17,19 +17,18 @@ public enum MapDirections {
     }
 
     public MapDirections getDirectionAfterRotation(int rotation){
-        int directionNumber = (this.directionNumber + rotation) % 8;
+        int afterRotationNumber = (directionNumber + rotation) % 8;
 
-        MapDirections direction = getMapDirectionFromDirectionNumber(directionNumber);
-        if (direction != null) return direction;
-        return this;
+        return getMapDirectionFromDirectionNumber(afterRotationNumber);
     }
 
-    public static MapDirections getMapDirectionFromDirectionNumber(int directionNumber) {
+    public static MapDirections getMapDirectionFromDirectionNumber(int givenNumber) {
         for(MapDirections direction: MapDirections.values()) {
-            if (direction.directionNumber == directionNumber) {
+            if (direction.directionNumber == givenNumber) {
                 return direction;
             }
         }
+
         return null;
     }
 

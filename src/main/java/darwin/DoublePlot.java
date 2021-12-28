@@ -3,23 +3,22 @@ package darwin;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
-
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ConcurrentLinkedQueue;
+
 
 public class DoublePlot{
-    private NumberAxis xAxis = new NumberAxis();
-    private NumberAxis yAxis = new NumberAxis();
-    private final XYChart.Series<Number, Number> series1 = new XYChart.Series<>();
-    private final XYChart.Series<Number, Number> series2 = new XYChart.Series<>();
+    private final LineChart<Number, Number> lineChart;
     private int firstDayInPlot = 0;
     private static final int maxPoints = 25;
-    private final LineChart<Number, Number> lineChart;
+    private final NumberAxis xAxis = new NumberAxis();
+    private final XYChart.Series<Number, Number> series1 = new XYChart.Series<>();
+    private final XYChart.Series<Number, Number> series2 = new XYChart.Series<>();
     private final List<Number> series1AllValues = new ArrayList<>();
     private final List<Number> series2AllValues = new ArrayList<>();
 
     public DoublePlot(String series1Name, String series2Name, Number firstValueSeries1, Number firstValueSeries2){
+        NumberAxis yAxis = new NumberAxis();
         lineChart = new LineChart<>(xAxis, yAxis);
         series1.setName(series1Name);
         series2.setName(series2Name);
@@ -37,9 +36,9 @@ public class DoublePlot{
         series2AllValues.add(secondSeriesValue);
 
         if (series1.getData().size() > maxPoints){
+            firstDayInPlot++;
             series1.getData().remove(0);
             series2.getData().remove(0);
-            firstDayInPlot++;
             xAxis.setLowerBound(firstDayInPlot);
             xAxis.setUpperBound(maxPoints+firstDayInPlot);
         }
